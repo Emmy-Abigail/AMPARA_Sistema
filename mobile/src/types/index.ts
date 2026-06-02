@@ -1,10 +1,8 @@
-// types - index.ts
-
-// ─── Tema ────────────────────────────────────────────────────────────────────
+// ─── Tema ─────────────────────────────────────────────────────────────────────
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-// ─── Autenticación ───────────────────────────────────────────────────────────
+// ─── Autenticación ────────────────────────────────────────────────────────────
 
 export interface Usuario {
   id: string;
@@ -12,10 +10,7 @@ export interface Usuario {
   apellido: string;
   email: string;
   telefono?: string;
-  departamento?: string;
-  provincia?: string;
-  distrito?: string;
-  rol: 'ciudadano' | 'inspector' | 'admin';
+  rol: 'usuario' | 'operador' | 'admin';
   creadoEn: string;
 }
 
@@ -30,9 +25,6 @@ export interface RegisterPayload {
   email: string;
   password: string;
   telefono?: string;
-  departamento?: string;
-  provincia?: string;
-  distrito?: string;
 }
 
 export interface AuthResponse {
@@ -45,9 +37,8 @@ export interface UpdatePerfilPayload {
   nombre?: string;
   apellido?: string;
   telefono?: string;
-  departamento?: string;
-  provincia?: string;
-  distrito?: string;
+  preferencia_contacto?: PreferenciaContacto;
+  horario_contacto?: string;
 }
 
 export interface CambiarPasswordPayload {
@@ -55,69 +46,75 @@ export interface CambiarPasswordPayload {
   password_nuevo: string;
 }
 
-// ─── Alertas por zona ────────────────────────────────────────────────────────
+// ─── Dominio — Denuncia ───────────────────────────────────────────────────────
 
-export type NivelAlerta = 'Alto' | 'Medio' | 'Bajo';
+export type TipoViolencia = 'Física' | 'Psicológica' | 'Sexual' | 'Económica' | 'Otra';
 
-export interface AlertaZona {
-  zona: string;
-  departamento: string;
-  provincia: string;
-  nivel: NivelAlerta;
-  descripcion: string;
-  total_reportes: number;
-  es_mi_zona: boolean;
-}
+export type RelacionAgresor =
+  | 'Cónyuge'
+  | 'Expareja'
+  | 'Familiar'
+  | 'Conocido'
+  | 'Desconocido';
 
-export interface AlertasZonaResponse {
-  alertas: AlertaZona[];
-  tiene_zona: boolean;
-}
+export type NivelRiesgo = 'urgente' | 'alto' | 'moderado';
 
-// ─── Reportes ────────────────────────────────────────────────────────────────
+export type PreferenciaContacto = 'app' | 'llamada' | 'ninguno';
 
-export type EstadoReporte = 'enviado' | 'en_revision' | 'resuelto' | 'rechazado';
+export type EstadoCaso =
+  | 'nueva'
+  | 'asignada'
+  | 'en_seguimiento'
+  | 'derivada'
+  | 'pendiente_confirmacion'
+  | 'cerrada';
 
-export type TipoLugar = 'Vivienda' | 'Vía Pública' | 'Terreno Abandonado' | 'Mercado' | 'Colegio' | 'Otro';
-export type TipoObjeto = 'Llantas' | 'Baldes' | 'Plantas' | 'Botellas' | 'Canales' | 'Otro';
-export type ObservaLarvas = 'Sí, claramente' | 'No estoy seguro' | 'No';
-export type ConocimientoDengue = 'Sí' | 'No lo sé' | 'No';
-
-export interface Reporte {
+export interface Denuncia {
   id: string;
-  usuario_id: string;
-  latitud: number;
-  longitud: number;
+  token_anonimo: string;
+  tipo_violencia: TipoViolencia;
+  relacion_agresor: RelacionAgresor;
+  nivel_riesgo: NivelRiesgo;
+  hay_heridos: boolean;
   foto_url?: string;
-  tipo_lugar: TipoLugar;
-  tipo_objeto: TipoObjeto;
-  observa_larvas: ObservaLarvas;
-  conocimiento_dengue_cercano?: ConocimientoDengue;
-  comentarios?: string;
-  estado: EstadoReporte;
-  fecha_reporte: string;
+  audio_url?: string;
+  latitud?: number;
+  longitud?: number;
+  preferencia_contacto: PreferenciaContacto;
+  horario_contacto?: string;
+  es_anonima: boolean;
+  estado: EstadoCaso;
+  fecha_denuncia: string;
   fecha_actualizacion: string;
 }
 
-export interface CrearReportePayload {
-  latitud: number;
-  longitud: number;
+export interface CrearDenunciaPayload {
+  tipo_violencia: TipoViolencia;
+  relacion_agresor: RelacionAgresor;
+  hay_heridos: boolean;
   foto_url?: string;
-  tipo_lugar: TipoLugar;
-  tipo_objeto: TipoObjeto;
-  observa_larvas: ObservaLarvas;
-  conocimiento_dengue_cercano?: ConocimientoDengue;
-  comentarios?: string;
-  // Campos de idempotencia: permiten reintentar el envío sin crear duplicados.
-  // device_id: UUID persistente del dispositivo, generado en la primera instalación.
-  // local_id:  UUID único por reporte, generado en el momento de crearlo.
+  audio_url?: string;
+  latitud?: number;
+  longitud?: number;
+  preferencia_contacto: PreferenciaContacto;
+  horario_contacto?: string;
   device_id?: string;
   local_id?: string;
-  direccion?: string;
 }
 
+// ─── Mensajes operador ↔ víctima ──────────────────────────────────────────────
 
-// ─── API ─────────────────────────────────────────────────────────────────────
+export interface MensajeCaso {
+  id: string;
+  denuncia_id: string;
+  autor: 'operador' | 'sistema';
+  contenido: string;
+  destruir_al_leer: boolean;
+  leido: boolean;
+  created_at: string;
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   data: T;
@@ -138,7 +135,7 @@ export interface ApiError {
   errores?: Record<string, string[]>;
 }
 
-// ─── Navegación ──────────────────────────────────────────────────────────────
+// ─── Navegación ───────────────────────────────────────────────────────────────
 
 export type RootStackParamList = {
   Splash: undefined;

@@ -1,32 +1,32 @@
-// services/db.ts — SQLite local queue for offline-first report submission
+// services/db.ts — Cola SQLite offline-first para denuncias
 //
-// This is NOT a replica of PostgreSQL. It is a temporary holding queue:
-// - Reports land here first (always, online or offline).
-// - The sync engine processes them and marks them 'enviado'.
-// - Sent records older than 7 days are pruned automatically.
-// - Observability fields (http_status, server_response, retry_count) exist
-//   solely for debugging during the pilot, not for application logic.
+// Este archivo es una cola temporal, NO una réplica de PostgreSQL.
+// - La denuncia se inserta aquí primero (siempre, con o sin red).
+// - El sync engine la sube al servidor y la marca como 'enviada'.
+// - Los registros enviados se limpian a los 7 días.
 
 import * as SQLite from 'expo-sqlite';
-import type { TipoLugar, TipoObjeto, ObservaLarvas, ConocimientoDengue } from '../types';
+import type { TipoViolencia, RelacionAgresor, PreferenciaContacto } from '../types';
 
-export type PendingReportStatus = 'pendiente' | 'enviando' | 'enviado' | 'fallido';
+export type PendingDenunciaStatus = 'pendiente' | 'enviando' | 'enviada' | 'fallida';
 
-export interface PendingReport {
+export interface PendingDenuncia {
   id: number;
   local_id: string;
   device_id: string;
-  latitud: number;
-  longitud: number;
-  direccion: string | null;
+  token_anonimo: string;
+  tipo_violencia: TipoViolencia;
+  relacion_agresor: RelacionAgresor;
+  hay_heridos: number; // SQLite no tiene bool — 0/1
   foto_local_uri: string | null;
   foto_url: string | null;
-  tipo_lugar: TipoLugar;
-  tipo_objeto: TipoObjeto;
-  observa_larvas: ObservaLarvas;
-  conocimiento_dengue_cercano: ConocimientoDengue | null;
-  comentarios: string | null;
-  estado: PendingReportStatus;
+  audio_local_uri: string | null;
+  audio_url: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  preferencia_contacto: PreferenciaContacto;
+  horario_contacto: string | null;
+  estado: PendingDenunciaStatus;
   created_at: string;
   updated_at: string;
   last_sync_attempt: string | null;
@@ -37,96 +37,90 @@ export interface PendingReport {
 
 let _db: SQLite.SQLiteDatabase | null = null;
 function getDb(): SQLite.SQLiteDatabase {
-  if (!_db) _db = SQLite.openDatabaseSync('sivapre.db');
+  if (!_db) _db = SQLite.openDatabaseSync('ampara.db');
   return _db;
 }
 
 export function initDb(): void {
   getDb().execSync(`
-    CREATE TABLE IF NOT EXISTS pending_reports (
-      id                          INTEGER PRIMARY KEY AUTOINCREMENT,
-      local_id                    TEXT    NOT NULL UNIQUE,
-      device_id                   TEXT    NOT NULL,
-      latitud                     REAL    NOT NULL,
-      longitud                    REAL    NOT NULL,
-      direccion                   TEXT,
-      foto_local_uri              TEXT,
-      foto_url                    TEXT,
-      tipo_lugar                  TEXT    NOT NULL,
-      tipo_objeto                 TEXT    NOT NULL,
-      observa_larvas              TEXT    NOT NULL,
-      conocimiento_dengue_cercano TEXT,
-      comentarios                 TEXT,
-      estado                      TEXT    NOT NULL DEFAULT 'pendiente',
-      created_at                  TEXT    NOT NULL,
-      updated_at                  TEXT    NOT NULL,
-      last_sync_attempt           TEXT,
-      http_status                 INTEGER,
-      server_response             TEXT,
-      retry_count                 INTEGER NOT NULL DEFAULT 0
+    CREATE TABLE IF NOT EXISTS pending_denuncias (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      local_id            TEXT    NOT NULL UNIQUE,
+      device_id           TEXT    NOT NULL,
+      token_anonimo       TEXT    NOT NULL,
+      tipo_violencia      TEXT    NOT NULL,
+      relacion_agresor    TEXT    NOT NULL,
+      hay_heridos         INTEGER NOT NULL DEFAULT 0,
+      foto_local_uri      TEXT,
+      foto_url            TEXT,
+      audio_local_uri     TEXT,
+      audio_url           TEXT,
+      latitud             REAL,
+      longitud            REAL,
+      preferencia_contacto TEXT   NOT NULL DEFAULT 'ninguno',
+      horario_contacto    TEXT,
+      estado              TEXT    NOT NULL DEFAULT 'pendiente',
+      created_at          TEXT    NOT NULL,
+      updated_at          TEXT    NOT NULL,
+      last_sync_attempt   TEXT,
+      http_status         INTEGER,
+      server_response     TEXT,
+      retry_count         INTEGER NOT NULL DEFAULT 0
     );
   `);
 
-  // Migration for installs that predate the 'direccion' column.
-  // ALTER TABLE ADD COLUMN IF NOT EXISTS requires SQLite 3.35+ which is not
-  // guaranteed across all environments — try/catch is the safe alternative.
-  try {
-    getDb().execSync(`ALTER TABLE pending_reports ADD COLUMN direccion TEXT`);
-  } catch {
-    // Column already exists — safe to ignore.
-  }
-
-  // Records stuck in 'enviando' mean the app crashed mid-sync. Reset them so
-  // they are picked up on the next sync instead of being silently abandoned.
+  // Resetear registros atascados en 'enviando' (crash durante sync anterior).
   getDb().runSync(
-    `UPDATE pending_reports SET estado = 'pendiente', updated_at = ? WHERE estado = 'enviando'`,
+    `UPDATE pending_denuncias SET estado = 'pendiente', updated_at = ? WHERE estado = 'enviando'`,
     [new Date().toISOString()],
   );
 }
 
-// ─── Write operations ─────────────────────────────────────────────────────────
+// ─── Escritura ────────────────────────────────────────────────────────────────
 
-export async function insertPendingReport(report: {
+export async function insertPendingDenuncia(d: {
   local_id: string;
   device_id: string;
-  latitud: number;
-  longitud: number;
-  direccion: string | null;
-  foto_local_uri: string | null;
-  tipo_lugar: TipoLugar;
-  tipo_objeto: TipoObjeto;
-  observa_larvas: ObservaLarvas;
-  conocimiento_dengue_cercano: ConocimientoDengue | null;
-  comentarios: string | null;
+  token_anonimo: string;
+  tipo_violencia: TipoViolencia;
+  relacion_agresor: RelacionAgresor;
+  hay_heridos: boolean;
+  foto_local_uri?: string | null;
+  audio_local_uri?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  preferencia_contacto: PreferenciaContacto;
+  horario_contacto?: string | null;
 }): Promise<void> {
   const now = new Date().toISOString();
-  // Pasar null por el bridge JS→Kotlin de expo-sqlite causa
-  // "Cannot convert '[object Object]' to a Kotlin type".
-  // Solución: omitir las claves con null — SQLite las trata como NULL nativo.
   const params: Record<string, string | number> = {
-    $local_id:       report.local_id,
-    $device_id:      report.device_id,
-    $latitud:        report.latitud,
-    $longitud:       report.longitud,
-    $tipo_lugar:     report.tipo_lugar,
-    $tipo_objeto:    report.tipo_objeto,
-    $observa_larvas: report.observa_larvas,
-    $created_at:     now,
-    $updated_at:     now,
+    $local_id:            d.local_id,
+    $device_id:           d.device_id,
+    $token_anonimo:       d.token_anonimo,
+    $tipo_violencia:      d.tipo_violencia,
+    $relacion_agresor:    d.relacion_agresor,
+    $hay_heridos:         d.hay_heridos ? 1 : 0,
+    $preferencia_contacto: d.preferencia_contacto,
+    $created_at:          now,
+    $updated_at:          now,
   };
-  if (report.direccion != null)                   params.$direccion      = report.direccion;
-  if (report.foto_local_uri != null)              params.$foto_local_uri = report.foto_local_uri;
-  if (report.conocimiento_dengue_cercano != null) params.$conocimiento   = report.conocimiento_dengue_cercano;
-  if (report.comentarios != null)                 params.$comentarios    = report.comentarios;
+  if (d.foto_local_uri)    params.$foto_local_uri   = d.foto_local_uri;
+  if (d.audio_local_uri)   params.$audio_local_uri  = d.audio_local_uri;
+  if (d.latitud != null)   params.$latitud           = d.latitud;
+  if (d.longitud != null)  params.$longitud          = d.longitud;
+  if (d.horario_contacto)  params.$horario_contacto = d.horario_contacto;
 
   await getDb().runAsync(
-    `INSERT OR IGNORE INTO pending_reports
-       (local_id, device_id, latitud, longitud, direccion, foto_local_uri, foto_url,
-        tipo_lugar, tipo_objeto, observa_larvas, conocimiento_dengue_cercano,
-        comentarios, estado, created_at, updated_at)
-     VALUES ($local_id, $device_id, $latitud, $longitud, $direccion, $foto_local_uri,
-             NULL, $tipo_lugar, $tipo_objeto, $observa_larvas, $conocimiento,
-             $comentarios, 'pendiente', $created_at, $updated_at)`,
+    `INSERT OR IGNORE INTO pending_denuncias
+       (local_id, device_id, token_anonimo, tipo_violencia, relacion_agresor,
+        hay_heridos, foto_local_uri, foto_url, audio_local_uri, audio_url,
+        latitud, longitud, preferencia_contacto, horario_contacto,
+        estado, created_at, updated_at)
+     VALUES
+       ($local_id, $device_id, $token_anonimo, $tipo_violencia, $relacion_agresor,
+        $hay_heridos, $foto_local_uri, NULL, $audio_local_uri, NULL,
+        $latitud, $longitud, $preferencia_contacto, $horario_contacto,
+        'pendiente', $created_at, $updated_at)`,
     params,
   );
 }
@@ -134,18 +128,14 @@ export async function insertPendingReport(report: {
 export function markAsSending(id: number): void {
   const now = new Date().toISOString();
   getDb().runSync(
-    `UPDATE pending_reports
-     SET estado = 'enviando', updated_at = ?, last_sync_attempt = ?
-     WHERE id = ?`,
+    `UPDATE pending_denuncias SET estado = 'enviando', updated_at = ?, last_sync_attempt = ? WHERE id = ?`,
     [now, now, id],
   );
 }
 
 export function markAsSent(id: number, httpStatus: number, serverResponse: string): void {
   getDb().runSync(
-    `UPDATE pending_reports
-     SET estado = 'enviado', updated_at = ?, http_status = ?, server_response = ?
-     WHERE id = ?`,
+    `UPDATE pending_denuncias SET estado = 'enviada', updated_at = ?, http_status = ?, server_response = ? WHERE id = ?`,
     [new Date().toISOString(), httpStatus, serverResponse, id],
   );
 }
@@ -157,12 +147,11 @@ export async function markAsFailed(
 ): Promise<void> {
   const now = new Date().toISOString();
   const params: Record<string, string | number> = { $now: now, $id: id };
-  if (httpStatus != null)     params.$http_status      = httpStatus;
-  if (serverResponse != null) params.$server_response  = serverResponse;
-
+  if (httpStatus != null)     params.$http_status     = httpStatus;
+  if (serverResponse != null) params.$server_response = serverResponse;
   await getDb().runAsync(
-    `UPDATE pending_reports
-     SET estado = 'fallido', updated_at = $now, last_sync_attempt = $now,
+    `UPDATE pending_denuncias
+     SET estado = 'fallida', updated_at = $now, last_sync_attempt = $now,
          http_status = $http_status, server_response = $server_response,
          retry_count = retry_count + 1
      WHERE id = $id`,
@@ -170,38 +159,41 @@ export async function markAsFailed(
   );
 }
 
-export function updateFotoUrl(localId: string, fotoUrl: string): void {
-  getDb().runSync(
-    `UPDATE pending_reports SET foto_url = ?, updated_at = ? WHERE local_id = ?`,
-    [fotoUrl, new Date().toISOString(), localId],
-  );
+export function updateMediaUrls(localId: string, fotoUrl?: string, audioUrl?: string): void {
+  const now = new Date().toISOString();
+  if (fotoUrl) {
+    getDb().runSync(
+      `UPDATE pending_denuncias SET foto_url = ?, updated_at = ? WHERE local_id = ?`,
+      [fotoUrl, now, localId],
+    );
+  }
+  if (audioUrl) {
+    getDb().runSync(
+      `UPDATE pending_denuncias SET audio_url = ?, updated_at = ? WHERE local_id = ?`,
+      [audioUrl, now, localId],
+    );
+  }
 }
 
-// ─── Read operations ──────────────────────────────────────────────────────────
+// ─── Lectura ──────────────────────────────────────────────────────────────────
 
-// Máximo de reintentos antes de abandonar un reporte.
-// Un reporte en 'fallido' con retry_count >= MAX_RETRY_COUNT ya no se procesa.
-// Queda en SQLite como registro de debugging y se limpia a los 7 días.
-// Razón: un error 422 (validación) nunca va a resolverse solo — reintentar
-// infinitamente satura el backend y el dispositivo sin ningún beneficio.
 export const MAX_RETRY_COUNT = 10;
 
-export function getPendingAndFailedReports(): PendingReport[] {
-  return getDb().getAllSync<PendingReport>(
-    `SELECT * FROM pending_reports
-     WHERE estado IN ('pendiente', 'fallido')
-       AND retry_count < ?
+export function getPendingAndFailedDenuncias(): PendingDenuncia[] {
+  return getDb().getAllSync<PendingDenuncia>(
+    `SELECT * FROM pending_denuncias
+     WHERE estado IN ('pendiente', 'fallida') AND retry_count < ?
      ORDER BY created_at ASC`,
     [MAX_RETRY_COUNT],
   );
 }
 
-// ─── Cleanup ──────────────────────────────────────────────────────────────────
+// ─── Limpieza ─────────────────────────────────────────────────────────────────
 
-export function cleanOldSentReports(daysOld = 7): void {
+export function cleanOldSentDenuncias(daysOld = 7): void {
   const cutoff = new Date(Date.now() - daysOld * 86_400_000).toISOString();
   getDb().runSync(
-    `DELETE FROM pending_reports WHERE estado = 'enviado' AND updated_at < ?`,
+    `DELETE FROM pending_denuncias WHERE estado = 'enviada' AND updated_at < ?`,
     [cutoff],
   );
 }

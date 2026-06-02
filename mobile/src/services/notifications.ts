@@ -4,8 +4,6 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from './api';
 
-// Remote push notifications were removed from Expo Go in SDK 53.
-// Running in a development build or standalone app is required.
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 export function initNotificationHandler(): void {
@@ -21,7 +19,7 @@ export function initNotificationHandler(): void {
       }),
     });
   } catch {
-    // expo-notifications no disponible (sin plugin configurado)
+    // expo-notifications no disponible
   }
 }
 
@@ -29,38 +27,33 @@ export async function registrarPushToken(): Promise<void> {
   if (!Device.isDevice || isExpoGo) return;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('reportes', {
-      name: 'Estado de reportes',
+    await Notifications.setNotificationChannelAsync('denuncias', {
+      name: 'Estado de casos',
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#0F6E56',
+      lightColor: '#7C3AED',
       sound: 'default',
     });
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
-
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-
   if (finalStatus !== 'granted') return;
 
   const projectId =
     (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
     Constants.easConfig?.projectId;
 
-  if (!projectId) {
-    console.error('[Push] projectId no disponible — verifica app.json extra.eas.projectId');
-    return;
-  }
+  if (!projectId) return;
 
   try {
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     await api.post('/auth/push-token', { token: tokenData.data });
-  } catch (err) {
-    console.error('[Push] Error al registrar token:', err);
+  } catch {
+    // Falla silenciosamente — push no es crítico para la app
   }
 }

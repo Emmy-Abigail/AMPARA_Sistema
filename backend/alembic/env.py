@@ -14,7 +14,8 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Importar todos los modelos para que Alembic los detecte en Base.metadata
-from app.models import Usuario, Reporte, CasoNoti, CasoNetlab  # noqa: F401
+from app.models import Usuario, Denuncia, MensajeCaso  # noqa: F401
+from app.models.audit_log import AuditLog  # noqa: F401
 
 # Configuración de logging de alembic.ini
 config = context.config

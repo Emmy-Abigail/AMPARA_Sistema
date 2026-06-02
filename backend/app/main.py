@@ -106,7 +106,7 @@ async def log_requests(request: Request, call_next):
         )
         raise
 
-# ─── Archivos estáticos (fotos de reportes) ───────────────────────────────────
+# ─── Archivos estáticos (evidencia de denuncias) ─────────────────────────────
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 

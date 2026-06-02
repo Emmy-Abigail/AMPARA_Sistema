@@ -1,114 +1,92 @@
-"""Tests de dashboard: KPIs, feed, cambio de estado, audit log, permisos."""
+"""Tests del dashboard: KPIs, listado, cambio de estado, mensajes, permisos."""
+
+import uuid
 
 from httpx import AsyncClient
-from tests.conftest import _unique_email, _headers, _headers_admin
+from tests.conftest import _headers, _headers_operador
 
 _PAYLOAD = {
-    "latitud": -3.7437,
-    "longitud": -73.2516,
-    "tipo_lugar": "Vivienda",
-    "tipo_objeto": "Baldes",
-    "observa_larvas": "Sí, claramente",
+    "tipo_violencia":       "Psicológica",
+    "relacion_agresor":     "Expareja",
+    "hay_heridos":          False,
+    "preferencia_contacto": "ninguno",
+    "device_id":            str(uuid.uuid4()),
+    "local_id":             str(uuid.uuid4()),
+    "token_anonimo":        "AMP-DASH-0001",
 }
 
 
-async def test_kpis_requiere_staff(client: AsyncClient):
+async def test_stats_requiere_operador(client: AsyncClient):
+    """Un usuario sin rol operador/admin no puede acceder a los KPIs."""
     h = await _headers(client)
-    r = await client.get("/api/v1/dashboard/kpis", headers=h)
+    r = await client.get("/api/v1/dashboard/stats", headers=h)
     assert r.status_code == 403
 
 
-async def test_kpis_admin(client: AsyncClient):
-    h = await _headers_admin(client)
-    r = await client.get("/api/v1/dashboard/kpis", headers=h)
+async def test_stats_retorna_estructura_correcta(client: AsyncClient):
+    h = await _headers_operador(client)
+    r = await client.get("/api/v1/dashboard/stats", headers=h)
     assert r.status_code == 200
-    body = r.json()
-    assert "total_reportes" in body
-    assert "reportes_con_larvas" in body
+    body = r.json()["data"]
+    for key in ("total", "activas", "urgentes", "hoy", "por_estado", "por_tipo", "tendencia"):
+        assert key in body, f"Falta clave '{key}' en stats"
 
 
-async def test_feed_retorna_lista(client: AsyncClient):
-    h = await _headers_admin(client)
-    r = await client.get("/api/v1/dashboard/feed", headers=h)
+async def test_listar_denuncias_con_filtro(client: AsyncClient):
+    h_op  = await _headers_operador(client)
+    h_usr = await _headers(client)
+    # Crear denuncia de prueba
+    p = {**_PAYLOAD, "device_id": str(uuid.uuid4()), "local_id": str(uuid.uuid4()), "token_anonimo": f"AMP-LST-{uuid.uuid4().hex[:4].upper()}"}
+    await client.post("/api/v1/denuncias/", json=p, headers=h_usr)
+
+    r = await client.get("/api/v1/dashboard/denuncias?estado=nueva", headers=h_op)
     assert r.status_code == 200
-    assert isinstance(r.json(), list)
+    body = r.json()["data"]
+    assert "data" in body and "total" in body
 
 
-async def test_feed_reporter_nombre_no_null(client: AsyncClient):
-    """Regresión: el feed nunca devuelve reporter.nombre = null aunque el usuario esté eliminado."""
-    h = await _headers_admin(client)
-    r = await client.get("/api/v1/dashboard/feed", headers=h)
+async def test_cambiar_estado_denuncia(client: AsyncClient):
+    h_op  = await _headers_operador(client)
+    h_usr = await _headers(client)
+    p = {**_PAYLOAD, "device_id": str(uuid.uuid4()), "local_id": str(uuid.uuid4()), "token_anonimo": f"AMP-EST-{uuid.uuid4().hex[:4].upper()}"}
+    r_den = await client.post("/api/v1/denuncias/", json=p, headers=h_usr)
+    denuncia_id = r_den.json()["data"]["id"]
+
+    r = await client.patch(
+        f"/api/v1/dashboard/denuncias/{denuncia_id}/estado",
+        json={"estado": "asignada"},
+        headers=h_op,
+    )
     assert r.status_code == 200
-    for item in r.json():
-        assert item["reporter"]["nombre"] is not None
-        assert item["reporter"]["nombre"] != ""
+    assert r.json()["data"]["estado"] == "asignada"
 
 
-async def test_cambio_estado_y_audit_log(client: AsyncClient):
-    """Cambiar estado crea una entrada en el audit log con datos correctos."""
-    h_user = await _headers(client)
-    r_reporte = await client.post("/api/v1/reportes", json=_PAYLOAD, headers=h_user)
-    assert r_reporte.status_code == 201
-    reporte_id = r_reporte.json()["data"]["id"]
+async def test_usuario_no_puede_cambiar_estado(client: AsyncClient):
+    """Un usuario sin rol operador no puede cambiar el estado de una denuncia."""
+    h_usr = await _headers(client)
+    p = {**_PAYLOAD, "device_id": str(uuid.uuid4()), "local_id": str(uuid.uuid4()), "token_anonimo": f"AMP-PERM-{uuid.uuid4().hex[:4].upper()}"}
+    r_den = await client.post("/api/v1/denuncias/", json=p, headers=h_usr)
+    denuncia_id = r_den.json()["data"]["id"]
 
-    h_admin = await _headers_admin(client)
-    r_patch = await client.patch(
-        f"/api/v1/dashboard/reportes/{reporte_id}/estado",
-        json={"estado": "en_revision"},
-        headers=h_admin,
+    r = await client.patch(
+        f"/api/v1/dashboard/denuncias/{denuncia_id}/estado",
+        json={"estado": "cerrada"},
+        headers=h_usr,
     )
-    assert r_patch.status_code == 200
-    assert r_patch.json()["estado"] == "en_revision"
+    assert r.status_code == 403
 
-    r_hist = await client.get(
-        f"/api/v1/dashboard/reportes/{reporte_id}/historial",
-        headers=h_admin,
+
+async def test_operador_envia_mensaje(client: AsyncClient):
+    h_op  = await _headers_operador(client)
+    h_usr = await _headers(client)
+    p = {**_PAYLOAD, "device_id": str(uuid.uuid4()), "local_id": str(uuid.uuid4()), "token_anonimo": f"AMP-MSG-{uuid.uuid4().hex[:4].upper()}"}
+    r_den = await client.post("/api/v1/denuncias/", json=p, headers=h_usr)
+    denuncia_id = r_den.json()["data"]["id"]
+
+    r = await client.post(
+        f"/api/v1/dashboard/denuncias/{denuncia_id}/mensajes",
+        json={"contenido": "Una patrulla está en camino.", "destruir_al_leer": False},
+        headers=h_op,
     )
-    assert r_hist.status_code == 200
-    historial = r_hist.json()
-    assert len(historial) >= 1
-    ultimo = historial[-1]
-    assert ultimo["estado_anterior"] == "enviado"
-    assert ultimo["estado_nuevo"] == "en_revision"
-    assert ultimo["actor_email"] == "admin@sivapre.gob.pe"
-
-
-async def test_audit_log_multiples_cambios(client: AsyncClient):
-    """Múltiples cambios de estado generan múltiples entradas en el log."""
-    h_user = await _headers(client)
-    r = await client.post("/api/v1/reportes", json=_PAYLOAD, headers=h_user)
-    reporte_id = r.json()["data"]["id"]
-
-    h_admin = await _headers_admin(client)
-    for estado in ("en_revision", "resuelto"):
-        await client.patch(
-            f"/api/v1/dashboard/reportes/{reporte_id}/estado",
-            json={"estado": estado},
-            headers=h_admin,
-        )
-
-    r_hist = await client.get(
-        f"/api/v1/dashboard/reportes/{reporte_id}/historial",
-        headers=h_admin,
-    )
-    assert len(r_hist.json()) == 2
-
-
-async def test_ciudadano_no_puede_cambiar_estado(client: AsyncClient):
-    h_user = await _headers(client)
-    r = await client.post("/api/v1/reportes", json=_PAYLOAD, headers=h_user)
-    reporte_id = r.json()["data"]["id"]
-
-    r_bad = await client.patch(
-        f"/api/v1/dashboard/reportes/{reporte_id}/estado",
-        json={"estado": "resuelto"},
-        headers=h_user,
-    )
-    assert r_bad.status_code == 403
-
-
-async def test_health_check(client: AsyncClient):
-    r = await client.get("/health")
-    assert r.status_code == 200
-    assert r.json()["status"] == "ok"
-    assert r.json()["db"] == "ok"
+    assert r.status_code == 201
+    assert r.json()["data"]["autor"] == "operador"

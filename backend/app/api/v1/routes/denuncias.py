@@ -112,7 +112,7 @@ async def crear_denuncia(
     authorization: Optional[str] = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    # Idempotencia: si ya existe un reporte con el mismo device_id + local_id, devuelve el existente
+    # Idempotencia: si ya existe una denuncia con el mismo device_id + local_id, devuelve la existente
     if data.device_id and data.local_id:
         result = await db.execute(
             select(Denuncia).where(

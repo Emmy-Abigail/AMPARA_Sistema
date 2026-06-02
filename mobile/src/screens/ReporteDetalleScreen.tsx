@@ -13,33 +13,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useTheme } from '../theme';
-import { useReporte } from '../hooks/useReportes';
-import type { MainStackParamList, EstadoReporte } from '../types';
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+import { useDenuncia, useMensajesCaso } from '../hooks/useDenuncias';
+import type { MainStackParamList, EstadoCaso } from '../types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ReporteDetalle'>;
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const ESTADO_CONFIG: Record<EstadoReporte, { label: string; icono: string }> = {
-  enviado:     { label: 'Enviado',     icono: 'time-outline' },
-  en_revision: { label: 'En revisión', icono: 'search-outline' },
-  resuelto:    { label: 'Resuelto',    icono: 'checkmark-done-circle-outline' },
-  rechazado:   { label: 'Rechazado',   icono: 'close-circle-outline' },
+const ESTADO_CONFIG: Record<EstadoCaso, { label: string; icono: string }> = {
+  nueva:                  { label: 'Nueva',                  icono: 'radio-button-on-outline'       },
+  asignada:               { label: 'Asignada',               icono: 'person-outline'                },
+  en_seguimiento:         { label: 'En seguimiento',         icono: 'sync-outline'                  },
+  derivada:               { label: 'Derivada',               icono: 'arrow-forward-circle-outline'  },
+  pendiente_confirmacion: { label: 'Pend. confirmación',     icono: 'hourglass-outline'             },
+  cerrada:                { label: 'Cerrada',                icono: 'checkmark-done-circle-outline' },
 };
 
-// ─── Componente de fila de detalle ────────────────────────────────────────────
-
-interface DetalleFilaProps {
-  icono: string;
-  label: string;
-  valor: string;
-  colors: ReturnType<typeof useTheme>['colors'];
-  ultimo?: boolean;
-}
-
-function DetalleFila({ icono, label, valor, colors, ultimo }: DetalleFilaProps) {
+function DetalleFila({ icono, label, valor, colors, ultimo }: {
+  icono: string; label: string; valor: string;
+  colors: ReturnType<typeof useTheme>['colors']; ultimo?: boolean;
+}) {
   return (
     <>
       <View style={styles.fila}>
@@ -47,30 +38,21 @@ function DetalleFila({ icono, label, valor, colors, ultimo }: DetalleFilaProps) 
           <Ionicons name={icono as any} size={18} color={colors.primary} />
         </View>
         <View style={styles.filaContent}>
-          <Text style={[styles.filaLabel, { color: colors.textSecondary }]}>
-            {label}
-          </Text>
-          <Text style={[styles.filaValor, { color: colors.text }]}>
-            {valor}
-          </Text>
+          <Text style={[styles.filaLabel, { color: colors.textSecondary }]}>{label}</Text>
+          <Text style={[styles.filaValor, { color: colors.text }]}>{valor}</Text>
         </View>
       </View>
-      {!ultimo && (
-        <View style={[styles.filaDivider, { backgroundColor: colors.divider }]} />
-      )}
+      {!ultimo && <View style={[styles.filaDivider, { backgroundColor: colors.divider }]} />}
     </>
   );
 }
-
-// ─── Pantalla ─────────────────────────────────────────────────────────────────
 
 export default function ReporteDetalleScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { data: reporte, isLoading, isError } = useReporte(id);
-
-  // ─── Estados de carga ──────────────────────────────────────────────────────
+  const { data: denuncia, isLoading, isError } = useDenuncia(id);
+  const { data: mensajes } = useMensajesCaso(id);
 
   if (isLoading) {
     return (
@@ -80,289 +62,148 @@ export default function ReporteDetalleScreen({ route, navigation }: Props) {
     );
   }
 
-  if (isError || !reporte) {
+  if (isError || !denuncia) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          No se pudo cargar el reporte.
-        </Text>
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>No se pudo cargar el caso.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={[styles.errorLink, { color: colors.primary }]}>
-            Volver
-          </Text>
+          <Text style={[styles.errorLink, { color: colors.primary }]}>Volver</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // ─── Datos derivados ───────────────────────────────────────────────────────
-
-  const estadoConfig = ESTADO_CONFIG[reporte.estado];
-
-  const estadoColors: Record<EstadoReporte, string> = {
-    enviado:     colors.primary,
-    en_revision: colors.warning,
-    resuelto:    colors.success,
-    rechazado:   colors.error,
+  const estadoConfig = ESTADO_CONFIG[denuncia.estado];
+  const estadoColors: Record<EstadoCaso, string> = {
+    nueva:                  colors.primary,
+    asignada:               colors.warning,
+    en_seguimiento:         colors.warning,
+    derivada:               colors.success,
+    pendiente_confirmacion: colors.warning,
+    cerrada:                colors.textDisabled,
   };
+  const estadoColor = estadoColors[denuncia.estado];
 
-  const estadoColor = estadoColors[reporte.estado];
-
-  const fecha = new Date(reporte.fecha_reporte).toLocaleDateString('es-PE', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+  const fecha = new Date(denuncia.fecha_denuncia).toLocaleDateString('es-PE', {
+    day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  const fechaActualizacion = new Date(reporte.fecha_actualizacion).toLocaleDateString('es-PE', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  // Filas del detalle — se construyen dinámicamente para no repetir JSX
   const filas = [
-    { icono: 'location-outline',      label: 'Coordenadas',        valor: `${reporte.latitud.toFixed(6)}, ${reporte.longitud.toFixed(6)}` },
-    { icono: 'home-outline',           label: 'Tipo de lugar',      valor: reporte.tipo_lugar },
-    { icono: 'cube-outline',           label: 'Tipo de objeto',     valor: reporte.tipo_objeto },
-    { icono: 'eye-outline',            label: '¿Observaste larvas?',valor: reporte.observa_larvas },
-    ...(reporte.conocimiento_dengue_cercano
-      ? [{ icono: 'alert-circle-outline', label: '¿Dengue cercano?', valor: reporte.conocimiento_dengue_cercano }]
-      : []),
-    ...(reporte.comentarios
-      ? [{ icono: 'chatbox-outline', label: 'Comentarios', valor: reporte.comentarios }]
-      : []),
+    { icono: 'alert-circle-outline',  label: 'Tipo de violencia', valor: denuncia.tipo_violencia },
+    { icono: 'person-outline',        label: 'Relación con agresor', valor: denuncia.relacion_agresor },
+    { icono: 'medkit-outline',        label: '¿Hay heridos?', valor: denuncia.hay_heridos ? 'Sí' : 'No' },
+    ...(denuncia.latitud != null ? [{ icono: 'location-outline', label: 'Ubicación', valor: `${denuncia.latitud.toFixed(5)}, ${denuncia.longitud?.toFixed(5)}` }] : []),
+    { icono: 'chatbubble-outline',    label: 'Contacto preferido', valor: denuncia.preferencia_contacto === 'app' ? 'Mensaje en app' : denuncia.preferencia_contacto === 'llamada' ? 'Llamada telefónica' : 'Sin contacto' },
+    { icono: 'key-outline',           label: 'Token de seguimiento', valor: denuncia.token_anonimo },
   ];
-
-  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <ScrollView
       style={[styles.scroll, { backgroundColor: colors.background }]}
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 },
-      ]}
+      contentContainerStyle={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 40 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Botón volver */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <Ionicons name="arrow-back-outline" size={20} color={colors.primary} />
-        <Text style={[styles.backText, { color: colors.primary }]}>
-          Mis reportes
-        </Text>
+        <Text style={[styles.backText, { color: colors.primary }]}>Mis casos</Text>
       </TouchableOpacity>
 
-      {/* Encabezado con estado */}
+      {/* Encabezado */}
       <View style={styles.encabezado}>
         <View style={styles.encabezadoTextos}>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>
-            Reporte
-          </Text>
-          <Text style={[styles.fecha, { color: colors.textSecondary }]}>
-            {fecha}
-          </Text>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Caso</Text>
+          <Text style={[styles.fecha, { color: colors.textSecondary }]}>{fecha}</Text>
         </View>
         <View style={[styles.estadoBadge, { backgroundColor: estadoColor + '20' }]}>
           <Ionicons name={estadoConfig.icono as any} size={14} color={estadoColor} />
-          <Text style={[styles.estadoText, { color: estadoColor }]}>
-            {estadoConfig.label}
-          </Text>
+          <Text style={[styles.estadoText, { color: estadoColor }]}>{estadoConfig.label}</Text>
         </View>
       </View>
 
-      {/* Foto */}
-      {reporte.foto_url ? (
-        <Image
-          source={{ uri: reporte.foto_url }}
-          style={styles.foto}
-          resizeMode="cover"
-        />
+      {/* Evidencia fotográfica */}
+      {denuncia.foto_url ? (
+        <Image source={{ uri: denuncia.foto_url }} style={styles.foto} resizeMode="cover" />
       ) : (
         <View style={[styles.fotoVacia, { backgroundColor: colors.surfaceVariant, borderColor: colors.border }]}>
           <Ionicons name="image-outline" size={40} color={colors.textDisabled} />
-          <Text style={[styles.fotoVaciaText, { color: colors.textDisabled }]}>
-            Sin foto adjunta
-          </Text>
+          <Text style={[styles.fotoVaciaText, { color: colors.textDisabled }]}>Sin foto adjunta</Text>
         </View>
       )}
 
-      {/* Card de detalles */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>
-        Detalles del hallazgo
-      </Text>
+      {/* Detalles */}
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Detalles del caso</Text>
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
-        {filas.map((fila, index) => (
-          <DetalleFila
-            key={fila.label}
-            icono={fila.icono}
-            label={fila.label}
-            valor={fila.valor}
-            colors={colors}
-            ultimo={index === filas.length - 1}
-          />
+        {filas.map((fila, i) => (
+          <DetalleFila key={fila.label} icono={fila.icono} label={fila.label} valor={fila.valor} colors={colors} ultimo={i === filas.length - 1} />
         ))}
       </View>
 
-      {/* Última actualización */}
-      <Text style={[styles.actualizacion, { color: colors.textDisabled }]}>
-        Última actualización: {fechaActualizacion}
-      </Text>
+      {/* Mensajes del operador */}
+      {mensajes && mensajes.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mensajes de seguimiento</Text>
+          {mensajes.map((msg) => (
+            <View key={msg.id} style={[styles.mensajeCard, { backgroundColor: colors.primarySubtle, borderLeftColor: colors.primary }]}>
+              <View style={styles.mensajeHeader}>
+                <Ionicons name="person-circle-outline" size={16} color={colors.primary} />
+                <Text style={[styles.mensajeAutor, { color: colors.primary }]}>Operador</Text>
+                <Text style={[styles.mensajeFecha, { color: colors.textDisabled }]}>
+                  {new Date(msg.created_at).toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })}
+                </Text>
+              </View>
+              <Text style={[styles.mensajeContenido, { color: colors.text }]}>{msg.contenido}</Text>
+            </View>
+          ))}
+        </>
+      )}
 
+      <Text style={[styles.actualizacion, { color: colors.textDisabled }]}>
+        Última actualización: {new Date(denuncia.fecha_actualizacion).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })}
+      </Text>
     </ScrollView>
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  scroll: { flex: 1 },
-  container: {
-    paddingHorizontal: 20,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  errorText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 15,
-    textAlign: 'center',
-  },
-  errorLink: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 14,
-  },
+  scroll:   { flex: 1 },
+  container:{ paddingHorizontal: 20 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  errorText:{ fontFamily: 'Inter-Regular', fontSize: 15, textAlign: 'center' },
+  errorLink:{ fontFamily: 'Montserrat-ExtraBold', fontSize: 14 },
 
-  // Navegación
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 20,
-  },
-  backText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-  },
+  backButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+  backText:   { fontFamily: 'Inter-Regular', fontSize: 14 },
 
-  // Encabezado
-  encabezado: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    gap: 12,
-  },
-  encabezadoTextos: {
-    flex: 1,
-    gap: 4,
-  },
-  pageTitle: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 26,
-  },
-  fecha: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 13,
-  },
-  estadoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 4,
-  },
-  estadoText: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 12,
-  },
+  encabezado:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
+  encabezadoTextos:{ flex: 1, gap: 4 },
+  pageTitle:       { fontFamily: 'Montserrat-ExtraBold', fontSize: 26 },
+  fecha:           { fontFamily: 'Inter-Regular', fontSize: 13 },
+  estadoBadge:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, marginTop: 4 },
+  estadoText:      { fontFamily: 'Montserrat-ExtraBold', fontSize: 12 },
 
-  // Foto
-  foto: {
-    width: '100%',
-    height: 220,
-    borderRadius: 14,
-    marginBottom: 24,
-  },
-  fotoVacia: {
-    height: 160,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    gap: 8,
-  },
-  fotoVaciaText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 13,
-  },
+  foto:      { width: '100%', height: 220, borderRadius: 14, marginBottom: 24 },
+  fotoVacia: { height: 120, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginBottom: 24, gap: 8 },
+  fotoVaciaText: { fontFamily: 'Inter-Regular', fontSize: 13 },
 
-  // Sección
-  sectionTitle: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 16,
-    marginBottom: 12,
-  },
-
-  // Card
+  sectionTitle: { fontFamily: 'Montserrat-ExtraBold', fontSize: 16, marginBottom: 12 },
   card: {
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    marginBottom: 16,
+    borderRadius: 14, paddingHorizontal: 16, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  fila: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 14,
-  },
-  filaIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filaContent: {
-    flex: 1,
-    gap: 3,
-  },
-  filaLabel: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 11,
-    letterSpacing: 0.3,
-  },
-  filaValor: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  filaDivider: {
-    height: 1,
-    marginLeft: 48,
-  },
+  fila:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 14 },
+  filaIconBox:{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  filaContent:{ flex: 1, gap: 3 },
+  filaLabel:  { fontFamily: 'Montserrat-ExtraBold', fontSize: 11, letterSpacing: 0.3 },
+  filaValor:  { fontFamily: 'Inter-Regular', fontSize: 14, lineHeight: 20 },
+  filaDivider:{ height: 1, marginLeft: 48 },
 
-  // Footer
-  actualizacion: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 11,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
+  mensajeCard: { borderRadius: 12, padding: 14, marginBottom: 10, borderLeftWidth: 3 },
+  mensajeHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  mensajeAutor:  { fontFamily: 'Montserrat-ExtraBold', fontSize: 12, flex: 1 },
+  mensajeFecha:  { fontFamily: 'Inter-Regular', fontSize: 11 },
+  mensajeContenido: { fontFamily: 'Inter-Regular', fontSize: 13, lineHeight: 20 },
+
+  actualizacion: { fontFamily: 'Inter-Regular', fontSize: 11, textAlign: 'center', marginTop: 8, marginBottom: 8 },
 });

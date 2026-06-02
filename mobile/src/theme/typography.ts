@@ -52,7 +52,7 @@ export const letterSpacing = {
 // Estilos de texto predefinidos
 // Sólo se usan las dos fuentes disponibles en assets/fonts/
 export const textStyles = {
-  // Títulos — Montserrat ExtraBold (marca SIVAPRE)
+  // Títulos — Montserrat ExtraBold (marca Ampara)
   h1: {
     fontFamily: fontFamily.montserrat.extraBold,
     fontSize: fontSize['4xl'],

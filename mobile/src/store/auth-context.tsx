@@ -4,7 +4,7 @@ import { setUnauthorizedHandler } from './auth-signal';
 import { authService } from '../services/auth';
 import { registrarPushToken, initNotificationHandler } from '../services/notifications';
 import { initDb } from '../services/db';
-import { startSyncListeners, stopSyncListeners, registerBackgroundSync, syncPendingReports } from '../services/sync';
+import { startSyncListeners, stopSyncListeners, registerBackgroundSync, syncPendingDenuncias } from '../services/sync';
 import type { Usuario } from '../types';
 
 interface AuthContextValue {
@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         registrarPushToken();
         startSyncListeners();
         registerBackgroundSync();
-        syncPendingReports(); // flush any reports pending from a previous session
+        syncPendingDenuncias();
       }
 
       setLoading(false);

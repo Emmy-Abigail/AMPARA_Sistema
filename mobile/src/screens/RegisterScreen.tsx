@@ -72,7 +72,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
         <Text style={[styles.title, { color: colors.text }]}>Crear cuenta</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Tu información es confidencial y está protegida
+          Tus datos están cifrados y solo el personal autorizado del ministerio accede a tu caso
         </Text>
 
         {errorMsg ? (

@@ -64,7 +64,7 @@ export default function WelcomeScreen({ navigation }: Props) {
         <View style={styles.privacyRow}>
           <Ionicons name="lock-closed-outline" size={12} color="rgba(255,255,255,0.5)" />
           <Text style={styles.privacyText}>
-            Sin rastro · Cifrado · 100 % confidencial
+            Cifrado · Solo personal autorizado accede a tu caso
           </Text>
         </View>
       </View>

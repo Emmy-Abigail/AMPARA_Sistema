@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,53 +16,68 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useTheme } from '../theme';
-import { useMisReportes } from '../hooks/useReportes';
-import type { MainTabParamList, MainStackParamList, Reporte, EstadoReporte } from '../types';
+import { useMisDenuncias } from '../hooks/useDenuncias';
+import type { MainTabParamList, MainStackParamList, EstadoCaso, NivelRiesgo, Denuncia } from '../types';
 
-// ─── Tipos y constantes ───────────────────────────────────────────────────────
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'MyReports'>,
   NativeStackScreenProps<MainStackParamList>
 >;
 
-type Filtro = 'Todos' | EstadoReporte;
+type Filtro = 'todas' | 'activas' | 'cerradas';
 
-const FILTROS: { label: string; value: Filtro }[] = [
-  { label: 'Todos',       value: 'Todos' },
-  { label: 'Enviado',     value: 'enviado' },
-  { label: 'En revisión', value: 'en_revision' },
-  { label: 'Resuelto',    value: 'resuelto' },
-  { label: 'Rechazado',   value: 'rechazado' },
-];
+// ─── Configuración de estados ─────────────────────────────────────────────────
 
-const ESTADO_CONFIG: Record<EstadoReporte, { label: string; icono: string }> = {
-  enviado:     { label: 'Enviado',     icono: 'time-outline' },
-  en_revision: { label: 'En revisión', icono: 'search-outline' },
-  resuelto:    { label: 'Resuelto',    icono: 'checkmark-done-circle-outline' },
-  rechazado:   { label: 'Rechazado',   icono: 'close-circle-outline' },
+const ESTADO_CONFIG: Record<EstadoCaso, { label: string; icono: string }> = {
+  nueva:                  { label: 'Nueva',               icono: 'radio-button-on-outline'       },
+  asignada:               { label: 'Asignada',             icono: 'person-outline'                },
+  en_seguimiento:         { label: 'En seguimiento',       icono: 'sync-outline'                  },
+  derivada:               { label: 'Derivada',             icono: 'arrow-forward-circle-outline'  },
+  pendiente_confirmacion: { label: 'Pend. confirmación',   icono: 'hourglass-outline'             },
+  cerrada:                { label: 'Cerrada',              icono: 'checkmark-done-circle-outline' },
 };
 
-// ─── Componente de tarjeta ────────────────────────────────────────────────────
+const ESTADO_COLOR = (estado: EstadoCaso, colors: ReturnType<typeof useTheme>['colors']): string => {
+  const map: Record<EstadoCaso, string> = {
+    nueva:                  colors.primary,
+    asignada:               colors.warning,
+    en_seguimiento:         colors.warning,
+    derivada:               colors.success,
+    pendiente_confirmacion: colors.warning,
+    cerrada:                colors.textDisabled,
+  };
+  return map[estado];
+};
 
-interface ReporteCardProps {
-  reporte: Reporte;
+const RIESGO_CONFIG: Record<NivelRiesgo, { label: string; color: string }> = {
+  urgente:  { label: 'URGENTE',  color: '#D32F2F' },
+  alto:     { label: 'ALTO',     color: '#C2410C' },
+  moderado: { label: 'MODERADO', color: '#0369A1' },
+};
+
+const ESTADOS_ACTIVOS: EstadoCaso[] = ['nueva', 'asignada', 'en_seguimiento', 'derivada', 'pendiente_confirmacion'];
+
+// ─── Tarjeta de caso ──────────────────────────────────────────────────────────
+
+function CasoCard({
+  denuncia,
+  colors,
+  onPress,
+}: {
+  denuncia: Denuncia;
   colors: ReturnType<typeof useTheme>['colors'];
   onPress: () => void;
-}
+}) {
+  const estadoColor  = ESTADO_COLOR(denuncia.estado, colors);
+  const estadoConfig = ESTADO_CONFIG[denuncia.estado];
+  const riesgoConfig = RIESGO_CONFIG[denuncia.nivel_riesgo];
 
-function ReporteCard({ reporte, colors, onPress }: ReporteCardProps) {
-  const estadoColors: Record<EstadoReporte, string> = {
-    enviado:     colors.primary,
-    en_revision: colors.warning,
-    resuelto:    colors.success,
-    rechazado:   colors.error,
-  };
-
-  const config = ESTADO_CONFIG[reporte.estado];
-  const color  = estadoColors[reporte.estado];
-  const fecha  = new Date(reporte.fecha_reporte).toLocaleDateString('es-PE', {
-    day: 'numeric', month: 'short', year: 'numeric',
+  const fecha = new Date(denuncia.fecha_denuncia).toLocaleDateString('es-PE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   });
 
   return (
@@ -70,168 +86,210 @@ function ReporteCard({ reporte, colors, onPress }: ReporteCardProps) {
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {/* Ícono de estado */}
-      <View style={[styles.iconBox, { backgroundColor: color + '20' }]}>
-        <Ionicons name={config.icono as any} size={22} color={color} />
-      </View>
+      {/* Indicador de riesgo (borde izquierdo de color) */}
+      <View style={[styles.cardRisk, { backgroundColor: riesgoConfig.color }]} />
 
-      {/* Contenido */}
-      <View style={styles.cardContent}>
+      <View style={styles.cardBody}>
+        {/* Fila superior: tipo + badge urgente */}
         <View style={styles.cardTopRow}>
-          <Text
-            style={[styles.cardTitulo, { color: colors.text }]}
-            numberOfLines={1}
-          >
-            {reporte.tipo_lugar} · {reporte.tipo_objeto}
+          <Text style={[styles.cardTipo, { color: colors.text }]} numberOfLines={1}>
+            {denuncia.tipo_violencia}
           </Text>
-          <View style={[styles.estadoBadge, { backgroundColor: color }]}>
-            <Text style={styles.estadoText}>{config.label}</Text>
-          </View>
+          {denuncia.hay_heridos && (
+            <View style={[styles.urgenteBadge, { backgroundColor: '#D32F2F' }]}>
+              <Ionicons name="medical-outline" size={10} color="#fff" />
+              <Text style={styles.urgenteText}>Heridos</Text>
+            </View>
+          )}
         </View>
-        <Text style={[styles.cardCoordenadas, { color: colors.textSecondary }]}>
-          📍 {reporte.latitud.toFixed(4)}, {reporte.longitud.toFixed(4)}
-        </Text>
-        <Text style={[styles.cardFecha, { color: colors.textDisabled }]}>
-          {fecha}
-        </Text>
+
+        {/* Fila media: estado + fecha */}
+        <View style={styles.cardMidRow}>
+          <View style={[styles.estadoBadge, { backgroundColor: estadoColor + '20' }]}>
+            <Ionicons name={estadoConfig.icono as any} size={12} color={estadoColor} />
+            <Text style={[styles.estadoText, { color: estadoColor }]}>{estadoConfig.label}</Text>
+          </View>
+          <Text style={[styles.cardFecha, { color: colors.textDisabled }]}>{fecha}</Text>
+        </View>
+
+        {/* Nivel de riesgo */}
+        <View style={styles.cardBottomRow}>
+          <View style={[styles.riesgoBadge, { backgroundColor: riesgoConfig.color + '15' }]}>
+            <Text style={[styles.riesgoText, { color: riesgoConfig.color }]}>
+              Riesgo {riesgoConfig.label}
+            </Text>
+          </View>
+          {denuncia.es_anonima && (
+            <View style={[styles.anonimaBadge, { backgroundColor: colors.surfaceVariant }]}>
+              <Ionicons name="eye-off-outline" size={11} color={colors.textSecondary} />
+              <Text style={[styles.anonimaText, { color: colors.textSecondary }]}>Anónima</Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={18} color={colors.textDisabled} />
+      <Ionicons name="chevron-forward" size={16} color={colors.textDisabled} style={styles.cardChevron} />
     </TouchableOpacity>
+  );
+}
+
+// ─── Skeleton de carga ────────────────────────────────────────────────────────
+
+function CasoSkeleton({ colors }: { colors: ReturnType<typeof useTheme>['colors'] }) {
+  return (
+    <View style={[styles.card, styles.skeletonCard, { backgroundColor: colors.surface }]}>
+      <View style={[styles.cardRisk, { backgroundColor: colors.border }]} />
+      <View style={styles.cardBody}>
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceVariant, width: '50%', height: 16, marginBottom: 10 }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceVariant, width: '35%', height: 12, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceVariant, width: '25%', height: 12 }]} />
+      </View>
+    </View>
   );
 }
 
 // ─── Pantalla principal ───────────────────────────────────────────────────────
 
 export default function MyReportsScreen({ navigation }: Props) {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { data, isLoading, isError, refetch, isRefetching } = useMisReportes();
-  const [filtroActivo, setFiltroActivo] = useState<Filtro>('Todos');
+  const { colors }    = useTheme();
+  const insets        = useSafeAreaInsets();
+  const [filtro, setFiltro] = useState<Filtro>('todas');
+  const [refreshing, setRefreshing] = useState(false);
 
-  const reportes = data?.data ?? [];
+  const { data, isLoading, isError, refetch } = useMisDenuncias();
 
-  const reportesFiltrados = filtroActivo === 'Todos'
-    ? reportes
-    : reportes.filter((r) => r.estado === filtroActivo);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
-  const total      = reportes.length;
-  const resueltos  = reportes.filter((r) => r.estado === 'resuelto').length;
-  const enRevision = reportes.filter((r) => r.estado === 'en_revision').length;
-  const enviados   = reportes.filter((r) => r.estado === 'enviado').length;
+  // ── Filtrado de datos ────────────────────────────────────────────────────
 
-  if (isLoading) {
+  const denuncias = data?.data ?? [];
+
+  const denunciasFiltradas = denuncias.filter((d) => {
+    if (filtro === 'activas')  return ESTADOS_ACTIVOS.includes(d.estado);
+    if (filtro === 'cerradas') return d.estado === 'cerrada';
+    return true;
+  });
+
+  const contadores = {
+    todas:   denuncias.length,
+    activas: denuncias.filter((d) => ESTADOS_ACTIVOS.includes(d.estado)).length,
+    cerradas: denuncias.filter((d) => d.estado === 'cerrada').length,
+  };
+
+  // ── Estado vacío ─────────────────────────────────────────────────────────
+
+  const renderVacio = () => {
+    const config: Record<Filtro, { icono: string; titulo: string; desc: string }> = {
+      todas:    { icono: 'folder-open-outline',   titulo: 'Sin denuncias aún',    desc: 'Cuando envíes una denuncia, aparecerá aquí.' },
+      activas:  { icono: 'shield-checkmark-outline', titulo: 'Sin casos activos', desc: 'No tienes casos en proceso actualmente.' },
+      cerradas: { icono: 'checkmark-done-circle-outline', titulo: 'Sin casos cerrados', desc: 'Los casos resueltos aparecerán aquí.' },
+    };
+    const { icono, titulo, desc } = config[filtro];
     return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.emptyBox, { backgroundColor: colors.surface }]}>
+        <Ionicons name={icono as any} size={40} color={colors.primary} />
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{titulo}</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>{desc}</Text>
       </View>
     );
-  }
+  };
 
-  if (isError) {
-    return (
-      <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <Ionicons name="cloud-offline-outline" size={48} color={colors.textDisabled} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          No se pudieron cargar tus reportes.{'\n'}Verifica tu conexión o vuelve a iniciar sesión.
-        </Text>
-        <TouchableOpacity
-          style={[styles.retryBtn, { backgroundColor: colors.primary }]}
-          onPress={() => refetch()}
-        >
-          <Text style={[styles.retryText, { color: colors.textOnPrimary }]}>Reintentar</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Encabezado */}
+      <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+        <View style={styles.headerTexts}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Mis casos</Text>
+          {data?.total != null && (
+            <View style={[styles.totalBadge, { backgroundColor: colors.primarySubtle }]}>
+              <Text style={[styles.totalText, { color: colors.primary }]}>{data.total}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
+          Sigue el estado de tus denuncias
+        </Text>
 
-      {/* Stats header */}
-      <View style={[styles.statsRow, { backgroundColor: colors.primary, paddingTop: insets.top + 16 }]}>
-        {[
-          { num: total,      label: 'Total',       color: colors.textOnPrimary },
-          { num: resueltos,  label: 'Resueltos',   color: colors.successText },
-          { num: enRevision, label: 'En revisión', color: colors.warningText },
-          { num: enviados,   label: 'Enviados',    color: colors.textOnPrimary },
-        ].map(({ num, label, color }) => (
-          <View key={label} style={styles.statBox}>
-            <Text style={[styles.statNum, { color }]}>{num}</Text>
-            <Text style={styles.statLabel}>{label}</Text>
-          </View>
-        ))}
+        {/* Filtros */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtrosScroll} contentContainerStyle={styles.filtrosContainer}>
+          {(['todas', 'activas', 'cerradas'] as Filtro[]).map((f) => {
+            const activo = filtro === f;
+            const label  = f.charAt(0).toUpperCase() + f.slice(1);
+            return (
+              <TouchableOpacity
+                key={f}
+                style={[
+                  styles.filtroChip,
+                  {
+                    backgroundColor: activo ? colors.primary : colors.surface,
+                    borderColor:     activo ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setFiltro(f)}
+              >
+                <Text style={[styles.filtroText, { color: activo ? colors.textOnPrimary : colors.textSecondary }, activo && styles.filtroTextActive]}>
+                  {label}
+                </Text>
+                <View style={[styles.filtroBadge, { backgroundColor: activo ? 'rgba(255,255,255,0.25)' : colors.surfaceVariant }]}>
+                  <Text style={[styles.filtroBadgeText, { color: activo ? colors.textOnPrimary : colors.textSecondary }]}>
+                    {contadores[f]}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Filtros */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtroScroll}
-        contentContainerStyle={styles.filtroContainer}
-      >
-        {FILTROS.map(({ label, value }) => {
-          const activo = filtroActivo === value;
-          return (
-            <TouchableOpacity
-              key={value}
-              style={[
-                styles.filtroChip,
-                {
-                  backgroundColor: activo ? colors.primary : colors.surface,
-                  borderColor: activo ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => setFiltroActivo(value)}
-            >
-              <Text
-                style={[
-                  styles.filtroText,
-                  { color: activo ? colors.textOnPrimary : colors.textSecondary },
-                  activo && styles.filtroTextActive,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
       {/* Lista */}
-      <FlatList
-        data={reportesFiltrados}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.lista}
-        showsVerticalScrollIndicator={false}
-        refreshing={isRefetching}
-        onRefresh={refetch}
-        renderItem={({ item }) => (
-          <ReporteCard
-            reporte={item}
-            colors={colors}
-            onPress={() => navigation.navigate('ReporteDetalle', { id: item.id })}
-          />
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Ionicons name="document-outline" size={48} color={colors.textDisabled} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {filtroActivo === 'Todos'
-                ? 'Aún no has enviado reportes.'
-                : 'No hay reportes en esta categoría.'}
-            </Text>
-            {filtroActivo === 'Todos' && (
-              <TouchableOpacity onPress={() => navigation.navigate('Report')}>
-                <Text style={[styles.emptyLink, { color: colors.primary }]}>
-                  Crear primer reporte
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        }
-      />
-
+      {isLoading ? (
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {[1, 2, 3].map((i) => <CasoSkeleton key={i} colors={colors} />)}
+        </ScrollView>
+      ) : isError ? (
+        <View style={styles.errorBox}>
+          <Ionicons name="cloud-offline-outline" size={40} color={colors.textDisabled} />
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            Sin conexión. Revisa tu internet e inténtalo de nuevo.
+          </Text>
+          <TouchableOpacity style={[styles.retryCTA, { backgroundColor: colors.primary }]} onPress={() => refetch()}>
+            <Text style={[styles.retryCTAText, { color: colors.textOnPrimary }]}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={denunciasFiltradas}
+          keyExtractor={(d) => d.id}
+          renderItem={({ item }) => (
+            <CasoCard
+              denuncia={item}
+              colors={colors}
+              onPress={() => navigation.navigate('ReporteDetalle', { id: item.id })}
+            />
+          )}
+          contentContainerStyle={[
+            styles.listContent,
+            denunciasFiltradas.length === 0 && styles.listContentEmpty,
+            { paddingBottom: insets.bottom + 40 },
+          ]}
+          ListEmptyComponent={renderVacio}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      )}
     </View>
   );
 }
@@ -239,143 +297,122 @@ export default function MyReportsScreen({ navigation }: Props) {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  screen: { flex: 1 },
+
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  statsRow: {
+  headerTexts: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 8,
-  },
-  statBox: {
-    flex: 1,
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 10,
-    paddingVertical: 10,
+    gap: 10,
+    marginBottom: 4,
   },
-  statNum: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 22,
-  },
-  statLabel: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  filtroScroll: {
-    maxHeight: 56,
-    marginVertical: 12,
-  },
-  filtroContainer: {
-    paddingHorizontal: 20,
-    gap: 8,
-    alignItems: 'center',
-  },
+  pageTitle:    { fontFamily: 'Montserrat-ExtraBold', fontSize: 26 },
+  pageSubtitle: { fontFamily: 'Inter-Regular', fontSize: 13, marginBottom: 16 },
+  totalBadge:   { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  totalText:    { fontFamily: 'Montserrat-ExtraBold', fontSize: 14 },
+
+  filtrosScroll:    { marginBottom: 4 },
+  filtrosContainer: { gap: 8, paddingRight: 4 },
   filtroChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 14,
+    paddingRight: 8,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1.5,
   },
-  filtroText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 13,
-  },
-  filtroTextActive: {
-    fontFamily: 'Montserrat-ExtraBold',
-  },
-  lista: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    gap: 12,
-  },
+  filtroText:       { fontFamily: 'Inter-Regular', fontSize: 13 },
+  filtroTextActive: { fontFamily: 'Montserrat-ExtraBold' },
+  filtroBadge:      { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, minWidth: 22, alignItems: 'center' },
+  filtroBadgeText:  { fontFamily: 'Montserrat-ExtraBold', fontSize: 11 },
+
+  listContent:      { paddingHorizontal: 20, paddingTop: 12 },
+  listContentEmpty: { flex: 1 },
+
+  // Card
   card: {
-    borderRadius: 14,
-    padding: 14,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'stretch',
+    borderRadius: 14,
+    marginBottom: 10,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
   },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardContent: {
-    flex: 1,
-    gap: 4,
-  },
-  cardTopRow: {
+  cardRisk:    { width: 4 },
+  cardBody:    { flex: 1, padding: 14, gap: 6 },
+  cardTopRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardMidRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTipo:    { fontFamily: 'Montserrat-ExtraBold', fontSize: 15, flex: 1 },
+  cardFecha:   { fontFamily: 'Inter-Regular', fontSize: 11, marginLeft: 'auto' },
+  cardChevron: { alignSelf: 'center', marginRight: 12 },
+
+  urgenteBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  cardTitulo: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 13,
-    flex: 1,
-  },
+  urgenteText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 10, color: '#FFFFFF' },
+
   estadoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  estadoText: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 10,
-    color: '#FFFFFF',
+  estadoText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 11 },
+
+  riesgoBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  riesgoText:  { fontFamily: 'Montserrat-ExtraBold', fontSize: 10 },
+
+  anonimaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  cardCoordenadas: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-  },
-  cardFecha: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 11,
-  },
+  anonimaText: { fontFamily: 'Inter-Regular', fontSize: 10 },
+
+  // Skeleton
+  skeletonCard: { minHeight: 90 },
+  skeletonLine: { borderRadius: 6 },
+
+  // Vacío / Error
   emptyBox: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
+  },
+  emptyTitle: { fontFamily: 'Montserrat-ExtraBold', fontSize: 16, marginTop: 4 },
+  emptyDesc:  { fontFamily: 'Inter-Regular', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+
+  errorBox: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 60,
+    paddingHorizontal: 32,
     gap: 12,
   },
-  emptyText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-  },
-  emptyLink: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 14,
-  },
-  errorText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 22,
-  },
-  retryBtn: {
-    marginTop: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryText: {
-    fontFamily: 'Montserrat-ExtraBold',
-    fontSize: 14,
-  },
+  errorText:    { fontFamily: 'Inter-Regular', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  retryCTA:     { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  retryCTAText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 14 },
 });

@@ -16,6 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 import { useMisDenuncias } from '../hooks/useDenuncias';
+import { useCasosLocales } from '../hooks/useCasosLocales';
 import type { AppColors } from '../theme';
 import type { MainTabParamList, MainStackParamList, EstadoCaso, Denuncia } from '../types';
 
@@ -84,17 +85,20 @@ function CasoCard({ caso, colors, onPress }: { caso: Denuncia; colors: AppColors
 export default function HomeScreen({ navigation }: Props) {
   const { colors }  = useTheme();
   const { usuario } = useAuth();
-  const { data: denunciasData, isLoading } = useMisDenuncias();
+  const { data: apiData, isLoading: apiLoading } = useMisDenuncias();
+  const { casosComoDenuncia, isLoading: localLoading } = useCasosLocales();
   const insets = useSafeAreaInsets();
 
   const primerNombre = usuario?.nombre?.split(' ')[0] ?? 'Usuaria';
 
-  const total       = denunciasData?.total ?? 0;
-  const activas     = denunciasData?.data?.filter(
-    (d) => !['cerrada'].includes(d.estado)
-  ).length ?? 0;
-  const cerradas    = denunciasData?.data?.filter((d) => d.estado === 'cerrada').length ?? 0;
-  const recientes   = denunciasData?.data?.slice(0, 3) ?? [];
+  // Datos del servidor si están disponibles, local como fallback inmediato
+  const denuncias: Denuncia[] = apiData?.data ?? casosComoDenuncia;
+  const isLoading = apiLoading && localLoading && denuncias.length === 0;
+
+  const total    = denuncias.length;
+  const activas  = denuncias.filter((d) => d.estado !== 'cerrada').length;
+  const cerradas = denuncias.filter((d) => d.estado === 'cerrada').length;
+  const recientes = denuncias.slice(0, 3);
 
   return (
     <ScrollView

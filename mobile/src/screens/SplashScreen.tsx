@@ -73,7 +73,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#7C3AED',
+    backgroundColor: '#6E2DB0',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   barFill: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: '#C4B5FD',
+    backgroundColor: '#D8B4FE',
   },
   version: {
     position: 'absolute',

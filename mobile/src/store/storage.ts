@@ -9,6 +9,7 @@ export const StorageKeys = {
   REFRESH_TOKEN:        'refresh_token',
   USER_DATA:            'user_data',
   DEVICE_ID:            'ampara_device_id',
+  GUEST_MODE:           'ampara_guest_mode',
   NOTIF_CASOS:          'notif_casos',
   NOTIF_MENSAJES:       'notif_mensajes',
 } as const;

@@ -2,12 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTheme } from '../theme';
+import { useAuth } from '../hooks/useAuth';
 import type { AuthStackParamList } from '../types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 
 export default function WelcomeScreen({ navigation }: Props) {
-  const { colors } = useTheme();
+  const { colors }       = useTheme();
+  const { loginAsGuest } = useAuth();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -47,7 +49,7 @@ export default function WelcomeScreen({ navigation }: Props) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+        <TouchableOpacity onPress={loginAsGuest}>
           <Text style={[styles.anonText, { color: colors.textDisabled }]}>
             Continuar de forma anónima
           </Text>

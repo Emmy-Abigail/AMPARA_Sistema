@@ -64,16 +64,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initDb();
 
     (async () => {
-      const token = await storage.getItem(StorageKeys.AUTH_TOKEN);
+      const [token, guestMode] = await Promise.all([
+        storage.getItem(StorageKeys.AUTH_TOKEN),
+        storage.getItem(StorageKeys.GUEST_MODE),
+      ]);
+
+      // Sesión anónima persistida — restaurar sin pasar por login
+      if (guestMode === 'true' && !token) {
+        setIsAuthenticated(true);
+        startSyncListeners();
+        syncPendingDenuncias();
+        setLoading(false);
+        return;
+      }
 
       if (token) {
         // Si el token expiró (o está a punto de expirar), intentar renovarlo
         // silenciosamente ANTES de marcar al usuario como autenticado.
-        // Evita el "flash": usuario ve HomeScreen → 401 → logout inmediato.
         if (_tokenIsExpiredOrExpiresSoon(token)) {
           const ok = await authService.refreshSession();
           if (!ok) {
-            // Refresh fallido: limpiar sesión y pedir login nuevamente.
             await Promise.all([
               storage.removeItem(StorageKeys.AUTH_TOKEN),
               storage.removeItem(StorageKeys.REFRESH_TOKEN),
@@ -86,9 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const raw = await storage.getItem(StorageKeys.USER_DATA);
         if (raw) {
-          try {
-            setUsuario(JSON.parse(raw) as Usuario);
-          } catch {}
+          try { setUsuario(JSON.parse(raw) as Usuario); } catch {}
         }
         setIsAuthenticated(true);
         registrarPushToken();

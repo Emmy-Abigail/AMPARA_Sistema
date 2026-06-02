@@ -2,44 +2,48 @@ from enum import Enum
 
 
 class RolEnum(str, Enum):
-    CIUDADANO = "ciudadano"
-    INSPECTOR = "inspector"
-    ADMIN = "admin"
+    USUARIO   = "usuario"
+    OPERADOR  = "operador"
+    ADMIN     = "admin"
 
 
-class EstadoReporteEnum(str, Enum):
-    ENVIADO = "enviado"
-    EN_REVISION = "en_revision"
-    RESUELTO = "resuelto"
-    RECHAZADO = "rechazado"
-    CANCELADO = "cancelado"
+class TipoViolenciaEnum(str, Enum):
+    FISICA        = "Física"
+    PSICOLOGICA   = "Psicológica"
+    SEXUAL        = "Sexual"
+    ECONOMICA     = "Económica"
+    OTRA          = "Otra"
 
 
-class TipoLugarEnum(str, Enum):
-    VIVIENDA = "Vivienda"
-    VIA_PUBLICA = "Vía Pública"
-    TERRENO_ABANDONADO = "Terreno Abandonado"
-    MERCADO = "Mercado"
-    COLEGIO = "Colegio"
-    OTRO = "Otro"
+class RelacionAgresorEnum(str, Enum):
+    CONYUGE      = "Cónyuge"
+    EXPAREJA     = "Expareja"
+    FAMILIAR     = "Familiar"
+    CONOCIDO     = "Conocido"
+    DESCONOCIDO  = "Desconocido"
 
 
-class TipoObjetoEnum(str, Enum):
-    LLANTAS = "Llantas"
-    BALDES = "Baldes"
-    PLANTAS = "Plantas"
-    BOTELLAS = "Botellas"
-    CANALES = "Canales"
-    OTRO = "Otro"
+class NivelRiesgoEnum(str, Enum):
+    URGENTE  = "urgente"
+    ALTO     = "alto"
+    MODERADO = "moderado"
 
 
-class ObservaLarvasEnum(str, Enum):
-    SI_CLARAMENTE = "Sí, claramente"
-    NO_SEGURO = "No estoy seguro"
-    NO = "No"
+class PreferenciaContactoEnum(str, Enum):
+    APP      = "app"
+    LLAMADA  = "llamada"
+    NINGUNO  = "ninguno"
 
 
-class ConocimientoDengueEnum(str, Enum):
-    SI = "Sí"
-    NO_LO_SE = "No lo sé"
-    NO = "No"
+class EstadoCasoEnum(str, Enum):
+    NUEVA                  = "nueva"
+    ASIGNADA               = "asignada"
+    EN_SEGUIMIENTO         = "en_seguimiento"
+    DERIVADA               = "derivada"
+    PENDIENTE_CONFIRMACION = "pendiente_confirmacion"
+    CERRADA                = "cerrada"
+
+
+class AutorMensajeEnum(str, Enum):
+    OPERADOR = "operador"
+    SISTEMA  = "sistema"

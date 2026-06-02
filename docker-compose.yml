@@ -4,7 +4,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: sivapre_backend
+    container_name: ampara_backend
     ports:
       - "8000:8000"
     volumes:
@@ -17,7 +17,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - sivapre-network
+      - ampara-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -28,26 +28,26 @@ services:
 
   db:
     image: postgis/postgis:16-3.4
-    container_name: sivapre_db
+    container_name: ampara_db
     env_file:
       - ./backend/.env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-sivapre}
-      POSTGRES_DB: ${POSTGRES_DB:-sivapre_db}
+      POSTGRES_USER:     ${POSTGRES_USER:-ampara}
+      POSTGRES_DB:       ${POSTGRES_DB:-ampara_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sivapre} -d ${POSTGRES_DB:-sivapre_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ampara} -d ${POSTGRES_DB:-ampara_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - sivapre-network
+      - ampara-network
     restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: sivapre_redis
+    container_name: ampara_redis
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -57,12 +57,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - sivapre-network
+      - ampara-network
     restart: unless-stopped
 
   dashboard:
     image: nginx:alpine
-    container_name: sivapre_dashboard
+    container_name: ampara_dashboard
     ports:
       - "80:80"
     volumes:
@@ -71,7 +71,7 @@ services:
     depends_on:
       - backend
     networks:
-      - sivapre-network
+      - ampara-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
@@ -85,5 +85,5 @@ volumes:
   redis_data:
 
 networks:
-  sivapre-network:
+  ampara-network:
     driver: bridge

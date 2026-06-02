@@ -33,16 +33,16 @@ if not settings.DEBUG:
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-logger = logging.getLogger("sivapre")
+logger = logging.getLogger("ampara")
 
 # ─── Aplicación ───────────────────────────────────────────────────────────────
 
 app = FastAPI(
-    title="SIVAPRE API",
+    title="Ampara API",
     version="1.0.0",
     description=(
-        "API del Sistema de Vigilancia y Prevención de Enfermedades (SIVAPRE). "
-        "Gestiona reportes epidemiológicos, usuarios, casos y visualización geoespacial."
+        "API del sistema Ampara — plataforma de denuncias de violencia de género. "
+        "Gestiona denuncias, seguimiento de casos y comunicación con operadores."
     ),
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
@@ -137,7 +137,7 @@ app.include_router(api_router)
 @app.get("/", tags=["Health"])
 async def root():
     return {
-        "message": "Bienvenido a SIVAPRE API",
+        "message": "Bienvenido a Ampara API",
         "version": app.version,
         "environment": settings.APP_ENV,
         "docs": "/docs" if settings.DEBUG else None,

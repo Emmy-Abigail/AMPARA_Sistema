@@ -1,19 +1,16 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, model_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from app.schemas.enums import RolEnum
+from app.schemas.enums import PreferenciaContactoEnum, RolEnum
 
 
 class UsuarioBase(BaseModel):
-    nombre: str = Field(..., max_length=150)
+    nombre:   str      = Field(..., max_length=150)
     apellido: str | None = Field(None, max_length=100)
-    email: EmailStr
+    email:    EmailStr
     telefono: str | None = Field(None, max_length=20)
-    departamento: str | None = Field(None, max_length=100)
-    provincia: str | None = Field(None, max_length=100)
-    distrito: str | None = Field(None, max_length=100)
 
 
 class UsuarioCreate(UsuarioBase):
@@ -21,53 +18,50 @@ class UsuarioCreate(UsuarioBase):
 
 
 class UsuarioUpdate(BaseModel):
-    nombre: str | None = Field(None, max_length=150)
-    apellido: str | None = Field(None, max_length=100)
-    telefono: str | None = Field(None, max_length=20)
-    departamento: str | None = Field(None, max_length=100)
-    provincia: str | None = Field(None, max_length=100)
-    distrito: str | None = Field(None, max_length=100)
+    nombre:               str | None = Field(None, max_length=150)
+    apellido:             str | None = Field(None, max_length=100)
+    telefono:             str | None = Field(None, max_length=20)
+    preferencia_contacto: PreferenciaContactoEnum | None = None
+    horario_contacto:     str | None = Field(None, max_length=100)
 
 
 class UsuarioResponse(BaseModel):
-    id: uuid.UUID
-    nombre: str
-    apellido: str | None = None
-    email: str
-    telefono: str | None = None
-    departamento: str | None = None
-    provincia: str | None = None
-    distrito: str | None = None
-    rol: RolEnum
-    creadoEn: datetime
+    id:                   uuid.UUID
+    nombre:               str
+    apellido:             str | None = None
+    email:                str
+    telefono:             str | None = None
+    preferencia_contacto: PreferenciaContactoEnum | None = None
+    horario_contacto:     str | None = None
+    rol:                  RolEnum
+    creadoEn:             datetime
 
     model_config = ConfigDict(from_attributes=True)
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
-    def map_fecha_registro(cls, data):
-        if hasattr(data, 'fecha_registro'):
+    def _map_fields(cls, data):
+        if hasattr(data, "fecha_registro"):
             return {
-                'id': data.id,
-                'nombre': data.nombre,
-                'apellido': data.apellido,
-                'email': data.email,
-                'telefono': data.telefono,
-                'departamento': data.departamento,
-                'provincia': data.provincia,
-                'distrito': data.distrito,
-                'rol': data.rol,
-                'creadoEn': data.fecha_registro,
+                "id":                   data.id,
+                "nombre":               data.nombre,
+                "apellido":             data.apellido,
+                "email":                data.email,
+                "telefono":             data.telefono,
+                "preferencia_contacto": data.preferencia_contacto,
+                "horario_contacto":     data.horario_contacto,
+                "rol":                  data.rol,
+                "creadoEn":             data.fecha_registro,
             }
         return data
 
 
 class CambiarPasswordRequest(BaseModel):
     password_actual: str
-    password_nuevo: str = Field(..., min_length=8)
+    password_nuevo:  str = Field(..., min_length=8)
 
 
 class AuthResponse(BaseModel):
-    token: str
+    token:        str
     refreshToken: str
-    usuario: UsuarioResponse
+    usuario:      UsuarioResponse

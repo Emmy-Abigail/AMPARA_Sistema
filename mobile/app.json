@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "Sivapre",
-    "slug": "sivapre",
+    "name": "Ampara",
+    "slug": "ampara",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/sivapre-logo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/sivapre-logo.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F6E56"
+      "backgroundColor": "#7C3AED"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "pe.gob.sivapre",
+      "bundleIdentifier": "com.ampara.app",
       "buildNumber": "1",
       "infoPlist": {
         "UIBackgroundModes": [
@@ -23,25 +23,25 @@
       }
     },
     "android": {
-      "package": "pe.gob.sivapre",
+      "package": "com.ampara.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/sivapre-logo.png",
-        "backgroundColor": "#0F6E56"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#7C3AED"
       },
       "edgeToEdgeEnabled": true,
       "usesCleartextTraffic": true
     },
     "web": {
-      "favicon": "./assets/sivapre-logo.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0F6E56",
-          "image": "./assets/sivapre-logo.png",
+          "backgroundColor": "#7C3AED",
+          "image": "./assets/icon.png",
           "imageWidth": 200
         }
       ],
@@ -57,7 +57,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "1f796d41-d73d-4a68-a03e-f92ba0cf641d"
+        "projectId": ""
       }
     }
   }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { useAuthContext } from '../store/auth-context';
-import { SivapreLogo } from '../components';
+import { AmparaLogo } from '../components';
 
 const ICON_SIZE = Math.min(Dimensions.get('window').width * 0.44, 210);
 
@@ -26,7 +26,6 @@ export default function SplashScreen() {
       }),
     ]).start();
 
-    // Barra de progreso animada (no usa native driver por ser width %)
     Animated.timing(barAnim, {
       toValue: 1,
       duration: 1800,
@@ -51,24 +50,19 @@ export default function SplashScreen() {
           { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
       >
-        {/* Ícono vectorial */}
-        <SivapreLogo size={ICON_SIZE} />
+        <AmparaLogo size={ICON_SIZE} />
 
-        {/* Nombre */}
-        <Text style={styles.appName}>Sivapre</Text>
+        <Text style={styles.appName}>Ampara</Text>
 
-        {/* Tagline */}
         <Text style={styles.tagline}>
-          VIGILANCIA PARTICIPATIVA{'\n'}CONTRA EL DENGUE
+          TU VOZ ES TU FUERZA{'\n'}DENUNCIA SEGURA Y CONFIDENCIAL
         </Text>
 
-        {/* Barra de progreso */}
         <View style={styles.barTrack}>
           <Animated.View style={[styles.barFill, { width: barWidth }]} />
         </View>
       </Animated.View>
 
-      {/* Versión fijada al fondo */}
       <Animated.Text style={[styles.version, { opacity: fadeAnim }]}>
         v1.0
       </Animated.Text>
@@ -79,7 +73,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F6E56',
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -114,7 +108,7 @@ const styles = StyleSheet.create({
   barFill: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: '#7EDFC0',
+    backgroundColor: '#C4B5FD',
   },
   version: {
     position: 'absolute',

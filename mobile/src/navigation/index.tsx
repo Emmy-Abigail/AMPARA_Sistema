@@ -73,19 +73,19 @@ const TAB_CONFIG: Record<
     iconActive: 'home',
   },
   Report: {
-    label: 'Reportar',
-    icon: 'add-circle-outline',
-    iconActive: 'add-circle',
+    label: 'Denunciar',
+    icon: 'alert-circle-outline',
+    iconActive: 'alert-circle',
   },
   MyReports: {
-    label: 'Mis reportes',
-    icon: 'document-text-outline',
-    iconActive: 'document-text',
+    label: 'Mis casos',
+    icon: 'folder-outline',
+    iconActive: 'folder',
   },
   Info: {
-    label: 'Información',
-    icon: 'information-circle-outline',
-    iconActive: 'information-circle',
+    label: 'Recursos',
+    icon: 'heart-outline',
+    iconActive: 'heart',
   },
 };
 
@@ -147,7 +147,7 @@ function TabNavigator() {
           tabBarIcon: ({ focused }) => (
             <View style={[styles.reportBtn, { backgroundColor: colors.primary }]}>
               <Ionicons
-                name={focused ? 'add-circle' : 'add-circle-outline'}
+                name={focused ? 'alert-circle' : 'alert-circle-outline'}
                 size={28}
                 color={colors.textOnPrimary}
               />
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Platform.OS === 'ios' ? 8 : 4,
-    shadowColor: '#0F6E56',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

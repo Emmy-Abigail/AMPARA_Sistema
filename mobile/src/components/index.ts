@@ -1,3 +1,2 @@
-// Componentes reutilizables de SIVAPRE
 export { default as UbigeoSelector } from './UbigeoSelector';
-export { default as SivapreLogo } from './SivapreLogo';
+export { default as AmparaLogo } from './AmparaLogo';

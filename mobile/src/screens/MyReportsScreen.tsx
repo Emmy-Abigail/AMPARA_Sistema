@@ -211,9 +211,9 @@ export default function MyReportsScreen({ navigation }: Props) {
       <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.headerTexts}>
           <Text style={[styles.pageTitle, { color: colors.text }]}>Mis casos</Text>
-          {data?.total != null && (
+          {denuncias.length > 0 && (
             <View style={[styles.totalBadge, { backgroundColor: colors.primarySubtle }]}>
-              <Text style={[styles.totalText, { color: colors.primary }]}>{data.total}</Text>
+              <Text style={[styles.totalText, { color: colors.primary }]}>{denuncias.length}</Text>
             </View>
           )}
         </View>

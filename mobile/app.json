@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Sivapre",
+    "slug": "sivapre",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/sivapre-logo.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/sivapre-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F6E56"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "pe.gob.sivapre",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "fetch"
+        ]
+      }
+    },
+    "android": {
+      "package": "pe.gob.sivapre",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/sivapre-logo.png",
+        "backgroundColor": "#0F6E56"
+      },
+      "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true
+    },
+    "web": {
+      "favicon": "./assets/sivapre-logo.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F6E56",
+          "image": "./assets/sivapre-logo.png",
+          "imageWidth": 200
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1f796d41-d73d-4a68-a03e-f92ba0cf641d"
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+# Overrides para desarrollo local — se aplica automáticamente con "docker compose up".
+# En producción usar "docker compose -f docker-compose.yml up -d" (sin este archivo).
+
+services:
+  backend:
+    volumes:
+      # Monta el código fuente para hot-reload durante el desarrollo.
+      # En producción el código está baked en la imagen — NO montar aquí.
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  db:
+    ports:
+      - "5433:5432"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: sivapre_pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sivapre.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    depends_on:
+      - db
+    networks:
+      - sivapre-network

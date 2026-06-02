@@ -1,0 +1,28 @@
+# Variables de entorno — nunca subir al repositorio
+.env
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Migraciones generadas localmente (opcional, depende del equipo)
+# alembic/versions/
+
+# Archivos de editor
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage

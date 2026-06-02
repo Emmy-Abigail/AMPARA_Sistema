@@ -1,0 +1,32 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+geoalchemy2==0.15.2
+alembic==1.14.0
+
+# Validation & settings
+pydantic[email]==2.10.3
+pydantic-settings==2.6.1
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# HTTP client async (push notifications)
+httpx==0.28.1
+
+# Rate limiting (Redis backend — contadores compartidos entre workers)
+slowapi==0.1.9
+redis==5.2.1
+
+# Image processing
+Pillow==11.2.1
+
+# File uploads
+python-multipart==0.0.20

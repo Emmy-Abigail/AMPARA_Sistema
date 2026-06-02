@@ -1,0 +1,17 @@
+# Variables de entorno
+.env
+*.env
+
+# Volúmenes y datos de Docker
+postgres_data/
+
+# Archivos de editor
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

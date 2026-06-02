@@ -24,6 +24,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../theme';
 import { insertPendingDenuncia } from '../services/db';
 import { syncPendingDenuncias } from '../services/sync';
+import { guardarCasoLocal } from '../services/casosLocales';
 import { storage, StorageKeys } from '../store/storage';
 import type { MainTabParamList, TipoViolencia, RelacionAgresor, NivelRiesgo, PreferenciaContacto } from '../types';
 
@@ -295,6 +296,8 @@ export default function ReportScreen({ navigation }: Props) {
       const deviceId = await getOrCreateDeviceId();
       const token    = generarToken();
 
+      const ahora = new Date().toISOString();
+
       await insertPendingDenuncia({
         local_id:             localIdRef.current,
         device_id:            deviceId,
@@ -307,6 +310,19 @@ export default function ReportScreen({ navigation }: Props) {
         longitud:             gps?.lng,
         preferencia_contacto: params.contacto,
         horario_contacto:     params.horario,
+      });
+
+      // Guardar en el almacén local para que "Mis casos" funcione sin conexión
+      await guardarCasoLocal({
+        token_anonimo:    token,
+        local_id:         localIdRef.current,
+        tipo_violencia:   params.tipo,
+        relacion_agresor: params.relacion,
+        nivel_riesgo:     calcularNivelRiesgo(params.relacion, params.heridos),
+        hay_heridos:      params.heridos,
+        fecha_denuncia:   ahora,
+        es_anonima:       true,
+        foto_url:         null,
       });
 
       // Sync fire-and-forget: si hay red, la denuncia llega en segundos
@@ -345,17 +361,16 @@ export default function ReportScreen({ navigation }: Props) {
         </View>
 
         <Text style={[styles.confirmedTitle, { color: colors.text }]}>
-          Denuncia enviada de forma segura
+          Estás acompañada
         </Text>
         <Text style={[styles.confirmedDesc, { color: colors.textSecondary }]}>
-          Tu alerta ha sido registrada. El equipo de Ampara revisará tu caso y te contactará según tu preferencia.
+          Tu denuncia fue registrada de forma segura. El equipo de Ampara revisará tu caso y te contactará según tu preferencia.
         </Text>
 
-        <View style={[styles.tokenCard, { backgroundColor: colors.primarySubtle, borderColor: colors.primary }]}>
-          <Text style={[styles.tokenLabel, { color: colors.primary }]}>Tu código de seguimiento</Text>
-          <Text style={[styles.tokenValue, { color: colors.text }]}>{tokenGenerado}</Text>
-          <Text style={[styles.tokenHint, { color: colors.textSecondary }]}>
-            Guárdalo en un lugar seguro. Lo necesitarás para consultar el estado de tu caso en "Mis casos".
+        <View style={[styles.confirmedInfoBox, { backgroundColor: colors.primarySubtle }]}>
+          <Ionicons name="folder-outline" size={20} color={colors.primary} />
+          <Text style={[styles.confirmedInfoText, { color: colors.primary }]}>
+            Puedes ver el estado de tu caso en "Mis casos" cuando estés en un lugar seguro.
           </Text>
         </View>
 
@@ -370,10 +385,6 @@ export default function ReportScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.btnSecondary} onPress={() => { resetForm(); navigation.navigate('Home'); }}>
           <Text style={[styles.btnSecondaryText, { color: colors.primary }]}>Ir al inicio</Text>
         </TouchableOpacity>
-
-        <Text style={[styles.confirmedNote, { color: colors.textDisabled }]}>
-          Cuando estés en un lugar seguro, completa tu perfil para un seguimiento más preciso.
-        </Text>
       </View>
     );
   }
@@ -724,7 +735,7 @@ export default function ReportScreen({ navigation }: Props) {
             disabled={!canContinue()}
           >
             <Text style={[styles.btnNextText, { color: colors.textOnPrimary }]}>
-              {step === 3 ? 'Continuar sin evidencia' : 'Continuar'}
+              {step === 3 && !fotoUri ? 'Continuar sin evidencia' : 'Continuar'}
             </Text>
             <Ionicons name="arrow-forward-outline" size={18} color={colors.textOnPrimary} />
           </TouchableOpacity>
@@ -968,18 +979,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  tokenCard: {
+  confirmedInfoBox: {
     width: '100%',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    borderRadius: 14,
+    padding: 16,
     marginVertical: 4,
   },
-  tokenLabel: { fontFamily: 'Montserrat-ExtraBold', fontSize: 12, letterSpacing: 1 },
-  tokenValue: { fontFamily: 'Montserrat-ExtraBold', fontSize: 28, letterSpacing: 3 },
-  tokenHint:  { fontFamily: 'Inter-Regular', fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  confirmedInfoText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    lineHeight: 20,
+    flex: 1,
+  },
   btnPrimary: {
     width: '100%',
     flexDirection: 'row',
@@ -993,11 +1007,4 @@ const styles = StyleSheet.create({
   btnPrimaryText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 15 },
   btnSecondary:   { paddingVertical: 10 },
   btnSecondaryText: { fontFamily: 'Inter-Regular', fontSize: 14, textDecorationLine: 'underline' },
-  confirmedNote: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginTop: 4,
-  },
 });

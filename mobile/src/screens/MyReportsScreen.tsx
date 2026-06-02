@@ -17,6 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useTheme } from '../theme';
 import { useMisDenuncias } from '../hooks/useDenuncias';
+import { useCasosLocales, casoLocalADenuncia } from '../hooks/useCasosLocales';
 import type { MainTabParamList, MainStackParamList, EstadoCaso, NivelRiesgo, Denuncia } from '../types';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -156,17 +157,21 @@ export default function MyReportsScreen({ navigation }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useMisDenuncias();
+  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useMisDenuncias();
+  const { casosComoDenuncia, isLoading: localLoading, refetch: refetchLocal } = useCasosLocales();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.allSettled([refetch(), refetchLocal()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetch, refetchLocal]);
 
-  // ── Filtrado de datos ────────────────────────────────────────────────────
-
-  const denuncias = data?.data ?? [];
+  // Prioridad: datos del servidor cuando están disponibles,
+  // datos locales como fallback inmediato (funciona sin conexión)
+  const denuncias: Denuncia[] = apiData?.data ?? casosComoDenuncia;
+  const isLoading = apiData === undefined && localLoading;
+  // Solo mostramos error si tampoco hay datos locales
+  const isError   = apiError && casosComoDenuncia.length === 0;
 
   const denunciasFiltradas = denuncias.filter((d) => {
     if (filtro === 'activas')  return ESTADOS_ACTIVOS.includes(d.estado);
@@ -175,8 +180,8 @@ export default function MyReportsScreen({ navigation }: Props) {
   });
 
   const contadores = {
-    todas:   denuncias.length,
-    activas: denuncias.filter((d) => ESTADOS_ACTIVOS.includes(d.estado)).length,
+    todas:    denuncias.length,
+    activas:  denuncias.filter((d) => ESTADOS_ACTIVOS.includes(d.estado)).length,
     cerradas: denuncias.filter((d) => d.estado === 'cerrada').length,
   };
 
@@ -247,6 +252,16 @@ export default function MyReportsScreen({ navigation }: Props) {
         </ScrollView>
       </View>
 
+      {/* Banner de datos locales cuando la API no está disponible */}
+      {apiError && casosComoDenuncia.length > 0 && (
+        <View style={[styles.offlineBanner, { backgroundColor: colors.warningLight }]}>
+          <Ionicons name="cloud-offline-outline" size={14} color={colors.warning} />
+          <Text style={[styles.offlineBannerText, { color: colors.warningText }]}>
+            Sin conexión — mostrando casos guardados localmente
+          </Text>
+        </View>
+      )}
+
       {/* Lista */}
       {isLoading ? (
         <ScrollView contentContainerStyle={styles.listContent}>
@@ -313,6 +328,15 @@ const styles = StyleSheet.create({
   pageSubtitle: { fontFamily: 'Inter-Regular', fontSize: 13, marginBottom: 16 },
   totalBadge:   { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
   totalText:    { fontFamily: 'Montserrat-ExtraBold', fontSize: 14 },
+
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  offlineBannerText: { fontFamily: 'Inter-Regular', fontSize: 12 },
 
   filtrosScroll:    { marginBottom: 4 },
   filtrosContainer: { gap: 8, paddingRight: 4 },

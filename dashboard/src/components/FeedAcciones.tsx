@@ -1,175 +1,432 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MapPin, CheckCircle, Clock, ChevronDown, ChevronUp, User, ShieldCheck } from 'lucide-react';
-import { useFeed, useActualizarEstado } from '../hooks/useDashboard';
-import type { Filtros, FeedItem } from '../types';
+import {
+  ChevronDown, ChevronUp, CheckCircle, AlertTriangle,
+  MapPin, ImageOff, Volume2, User, Send, Trash2,
+  ShieldCheck, Scale, Home, UserCheck,
+} from 'lucide-react';
+import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useDenuncias, useCambiarEstado, useAsignarOperador, useOperadores, useSendMensaje } from '../hooks/useDashboard';
+import type { Filtros, Denuncia, EstadoCaso, NivelRiesgo } from '../types';
 import { Badge } from './ui/Badge';
 
-type EstadoFiltro = 'todos' | 'enviado' | 'en_revision' | 'resuelto' | 'rechazado';
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const FILTROS: { value: EstadoFiltro; label: string }[] = [
-  { value: 'todos',       label: 'Todos' },
-  { value: 'enviado',     label: 'Enviados' },
-  { value: 'en_revision', label: 'En revisión' },
-  { value: 'resuelto',    label: 'Resueltos' },
-  { value: 'rechazado',   label: 'Rechazados' },
-];
-
-const ESTADOS_ACCION = [
-  { value: 'en_revision', label: 'En revisión' },
-  { value: 'resuelto',    label: 'Resuelto' },
-  { value: 'rechazado',   label: 'Rechazado' },
-];
-
-function estadoVariant(e: string): 'green' | 'yellow' | 'gray' | 'red' {
-  const m: Record<string, 'green' | 'yellow' | 'gray' | 'red'> = {
-    enviado: 'green', en_revision: 'yellow', resuelto: 'gray', rechazado: 'red', cancelado: 'gray',
-  };
-  return m[e] ?? 'gray';
+function nivelVariant(n: NivelRiesgo): 'red' | 'yellow' | 'purple' {
+  if (n === 'urgente') return 'red';
+  if (n === 'alto')    return 'yellow';
+  return 'purple';
 }
 
-function estadoLabel(e: string) {
-  const m: Record<string, string> = {
-    enviado: 'Enviado', en_revision: 'En revisión', resuelto: 'Resuelto',
-    rechazado: 'Rechazado', cancelado: 'Cancelado',
-  };
-  return m[e] ?? e;
+function nivelColor(n: NivelRiesgo): string {
+  if (n === 'urgente') return '#EF4444';
+  if (n === 'alto')    return '#F59E0B';
+  return '#8B43D4';
 }
 
-function FeedCard({ item }: { item: FeedItem }) {
-  const [expanded, setExpanded] = useState(false);
-  const { mutate: cambiarEstado, isPending } = useActualizarEstado();
+const ESTADO_LABEL: Record<EstadoCaso, string> = {
+  nueva:                  'Nueva',
+  asignada:               'Asignada',
+  en_seguimiento:         'En seguimiento',
+  derivada:               'Derivada',
+  pendiente_confirmacion: 'Pendiente confirmación',
+  cerrada:                'Cerrada',
+};
 
-  const esCerrado = ['resuelto', 'rechazado', 'cancelado'].includes(item.estado);
+const ESTADO_VARIANT: Record<EstadoCaso, 'blue' | 'yellow' | 'green' | 'gray' | 'red' | 'purple'> = {
+  nueva:                  'blue',
+  asignada:               'yellow',
+  en_seguimiento:         'yellow',
+  derivada:               'green',
+  pendiente_confirmacion: 'orange' as any,
+  cerrada:                'gray',
+};
+
+// Workflow: qué estados se puede transicionar desde cada estado actual
+const NEXT_ESTADOS: Partial<Record<EstadoCaso, EstadoCaso[]>> = {
+  nueva:                  ['asignada', 'en_seguimiento', 'cerrada'],
+  asignada:               ['en_seguimiento', 'derivada', 'cerrada'],
+  en_seguimiento:         ['derivada', 'pendiente_confirmacion', 'cerrada'],
+  derivada:               ['pendiente_confirmacion', 'en_seguimiento', 'cerrada'],
+  pendiente_confirmacion: ['cerrada', 'en_seguimiento'],
+};
+
+const DERIVACIONES = [
+  { destino: 'comisaría',       label: 'Comisaría',       Icon: ShieldCheck, color: 'bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-400' },
+  { destino: 'fiscalía',        label: 'Fiscalía',        Icon: Scale,       color: 'bg-orange-50 text-orange-700 border-orange-200 hover:border-orange-400' },
+  { destino: 'casa de acogida', label: 'Casa de acogida', Icon: Home,        color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-400' },
+] as const;
+
+// ─── Mini Mapa ────────────────────────────────────────────────────────────────
+
+function MiniMapa({ lat, lng, nivel }: { lat: number; lng: number; nivel: NivelRiesgo }) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-[#DDD0F5]" style={{ height: 120 }}>
+      <MapContainer
+        center={[lat, lng]}
+        zoom={14}
+        zoomControl={false}
+        scrollWheelZoom={false}
+        dragging={false}
+        doubleClickZoom={false}
+        style={{ height: '100%', width: '100%' }}
+        attributionControl={false}
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <CircleMarker
+          center={[lat, lng]}
+          radius={10}
+          pathOptions={{ fillColor: nivelColor(nivel), fillOpacity: 0.9, color: '#fff', weight: 2.5 }}
+        />
+      </MapContainer>
+    </div>
+  );
+}
+
+// ─── Sección de evidencia ────────────────────────────────────────────────────
+
+function Evidencia({ fotoUrl, audioUrl }: { fotoUrl?: string | null; audioUrl?: string | null }) {
+  if (!fotoUrl && !audioUrl) return null;
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Evidencia</p>
+      <div className="flex gap-3 flex-wrap">
+        {fotoUrl ? (
+          <a href={fotoUrl} target="_blank" rel="noopener noreferrer" className="block">
+            <img
+              src={fotoUrl}
+              alt="Evidencia fotográfica"
+              className="h-24 w-auto rounded-xl object-cover border border-[#DDD0F5] hover:opacity-90 transition-opacity cursor-zoom-in"
+            />
+          </a>
+        ) : null}
+        {audioUrl ? (
+          <div className="flex-1 min-w-48">
+            <div className="flex items-center gap-2 bg-[#F3EFFE] rounded-xl px-3 py-2 border border-[#DDD0F5] mb-1">
+              <Volume2 size={14} className="text-[#8B43D4] flex-shrink-0" />
+              <span className="text-xs text-[#5E4480]">Audio adjunto</span>
+            </div>
+            <audio controls src={audioUrl} className="w-full h-8" style={{ height: 32 }} />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─── Formulario de mensaje a víctima ─────────────────────────────────────────
+
+function MensajeForm({ denunciaId }: { denunciaId: string }) {
+  const [texto, setTexto] = useState('');
+  const [destruir, setDestruir] = useState(false);
+  const [sent, setSent] = useState(false);
+  const { mutate: send, isPending } = useSendMensaje();
+
+  const handleSend = () => {
+    if (!texto.trim()) return;
+    send(
+      { denunciaId, contenido: texto.trim(), destruirAlLeer: destruir },
+      {
+        onSuccess: () => {
+          setTexto('');
+          setDestruir(false);
+          setSent(true);
+          setTimeout(() => setSent(false), 3000);
+        },
+      },
+    );
+  };
 
   return (
-    <div className={`border rounded-xl overflow-hidden transition-all ${
-      esCerrado ? 'border-gray-100 opacity-80' : 'border-gray-200 hover:border-[#0F6E56]/30'
-    }`}>
+    <div>
+      <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Mensaje a la víctima</p>
+      {sent && (
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2 text-xs text-emerald-700 font-semibold">
+          <CheckCircle size={13} /> Mensaje enviado
+        </div>
+      )}
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        placeholder='Ej: "Una patrulla está en camino, mantente a salvo"'
+        rows={3}
+        className="w-full text-xs border border-[#DDD0F5] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20 text-[#1A0A2E] placeholder-[#B09CC8] bg-white"
+      />
+      <div className="flex items-center justify-between mt-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <div
+            onClick={() => setDestruir((v) => !v)}
+            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer ${
+              destruir ? 'bg-[#8B43D4] border-[#8B43D4]' : 'border-gray-300'
+            }`}
+          >
+            {destruir && <Trash2 size={9} className="text-white" />}
+          </div>
+          <span className="text-[10px] text-[#5E4480]">Destruir al leer</span>
+        </label>
+        <button
+          onClick={handleSend}
+          disabled={!texto.trim() || isPending}
+          className="flex items-center gap-1.5 bg-[#8B43D4] hover:bg-[#6E2DB0] text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isPending ? (
+            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Send size={11} />
+          )}
+          Enviar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Card del expediente ──────────────────────────────────────────────────────
+
+function ExpedienteCard({ denuncia }: { denuncia: Denuncia }) {
+  const [expanded, setExpanded] = useState(false);
+  const [motivoCierre, setMotivoCierre] = useState('');
+  const { mutate: cambiarEstado, isPending: cambiando } = useCambiarEstado();
+  const { mutate: asignarOperador, isPending: asignando } = useAsignarOperador();
+  const { data: operadores } = useOperadores();
+
+  const esCerrada    = denuncia.estado === 'cerrada';
+  const esUrgente    = denuncia.nivel_riesgo === 'urgente';
+  const nextEstados  = NEXT_ESTADOS[denuncia.estado] ?? [];
+  const tieneUbicacion = denuncia.latitud != null && denuncia.longitud != null;
+
+  const fecha = format(new Date(denuncia.fecha_denuncia), "d MMM · HH:mm", { locale: es });
+
+  const handleDerivacion = (destino: string) => {
+    cambiarEstado({
+      id: denuncia.id,
+      estado: 'derivada',
+      motivo_cierre: `Derivada a ${destino}`,
+    });
+  };
+
+  const handleCerrar = () => {
+    cambiarEstado({
+      id: denuncia.id,
+      estado: 'cerrada',
+      motivo_cierre: motivoCierre || undefined,
+    });
+  };
+
+  return (
+    <div
+      className={`border rounded-2xl overflow-hidden transition-all ${
+        esUrgente && !esCerrada
+          ? 'border-red-300 animate-pulse-urgente'
+          : esCerrada
+          ? 'border-gray-100 opacity-70'
+          : 'border-[#DDD0F5] hover:border-[#8B43D4]/40'
+      }`}
+    >
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div
-        className="flex items-start gap-3 p-3.5 cursor-pointer select-none"
+        className={`flex items-start gap-3 p-3.5 cursor-pointer select-none ${
+          esUrgente && !esCerrada ? 'bg-red-50/60' : 'bg-white'
+        }`}
         onClick={() => setExpanded((v) => !v)}
       >
-        {/* Foto */}
-        <div className="w-11 h-11 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
-          {item.foto_url ? (
-            <img src={item.foto_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <MapPin size={16} className="text-gray-300" />
-            </div>
-          )}
+        {/* Indicador de nivel */}
+        <div className={`mt-1 flex-shrink-0 ${esUrgente && !esCerrada ? 'animate-dot-urgente' : ''}`}>
+          <div
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: nivelColor(denuncia.nivel_riesgo) }}
+          />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-0.5">
-            <p className="text-xs font-semibold text-gray-900 truncate">
-              {item.tipo_lugar} · {item.tipo_objeto}
+          {/* Título + estado */}
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <p className="text-xs font-bold text-[#1A0A2E] leading-snug">
+              {denuncia.tipo_violencia}
+              <span className="font-normal text-[#5E4480]"> · {denuncia.relacion_agresor}</span>
             </p>
-            <Badge variant={estadoVariant(item.estado)}>
-              {estadoLabel(item.estado)}
+            <Badge variant={ESTADO_VARIANT[denuncia.estado]}>
+              {ESTADO_LABEL[denuncia.estado]}
             </Badge>
           </div>
 
-          {/* Reportante */}
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-0.5">
-            <User size={9} className="text-gray-400 flex-shrink-0" />
-            <span className="truncate">{item.reporter.nombre}</span>
-          </div>
-
-          {/* Dirección */}
-          <div className="flex items-center gap-1 text-xs text-gray-400 mb-0.5">
-            <MapPin size={9} className="flex-shrink-0" />
-            <span className="truncate">
-              {item.direccion || `${item.reporter.distrito || item.reporter.provincia || '—'}`}
-            </span>
-          </div>
-
-          {/* Hora + actor (quien se hizo cargo) */}
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] text-gray-400 flex items-center gap-1">
-              <Clock size={9} />
-              {item.fecha_reporte
-                ? format(new Date(item.fecha_reporte), "d MMM · HH:mm", { locale: es })
-                : '—'}
-            </p>
-            {item.last_actor && (
-              <p className="text-[10px] text-[#0F6E56] flex items-center gap-1 truncate">
-                <ShieldCheck size={9} />
-                <span className="truncate">
-                  {item.last_actor.nombre || item.last_actor.email.split('@')[0]}
-                </span>
-              </p>
+          {/* Token + heridos */}
+          <div className="flex items-center gap-3 mb-0.5">
+            <span className="text-[10px] font-mono text-[#B09CC8]">{denuncia.token_anonimo}</span>
+            {denuncia.hay_heridos && (
+              <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold">
+                <AlertTriangle size={9} /> Heridos
+              </span>
             )}
+          </div>
+
+          {/* Riesgo + fecha */}
+          <div className="flex items-center justify-between">
+            <Badge variant={nivelVariant(denuncia.nivel_riesgo)}>
+              {denuncia.nivel_riesgo}
+            </Badge>
+            <span className="text-[10px] text-[#B09CC8]">{fecha}</span>
           </div>
         </div>
 
-        <span className="text-gray-300 flex-shrink-0 mt-1">
-          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        <span className="text-[#B09CC8] flex-shrink-0 mt-1">
+          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </span>
       </div>
 
+      {/* ── Expediente expandible ─────────────────────────────────────────── */}
       {expanded && (
-        <div className="border-t border-gray-100 px-4 pb-4 pt-3 bg-gray-50/50">
-          {item.foto_url && (
-            <img
-              src={item.foto_url}
-              alt="Foto del criadero"
-              className="w-full h-36 object-cover rounded-xl mb-3"
-            />
-          )}
+        <div className="expediente-expand border-t border-[#EBE3F9] bg-[#F8F5FE] px-4 pb-4 pt-3 space-y-4">
 
-          <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-            <InfoRow label="Lugar" value={item.tipo_lugar} />
-            <InfoRow label="Objeto" value={item.tipo_objeto} />
-            <InfoRow label="Larvas" value={item.observa_larvas} />
-            {item.conocimiento_dengue_cercano && (
-              <InfoRow label="Dengue cercano" value={item.conocimiento_dengue_cercano} />
-            )}
-            {item.direccion ? (
-              <div className="col-span-2"><InfoRow label="Dirección" value={item.direccion} /></div>
-            ) : (
-              <>
-                <InfoRow label="Lat" value={item.lat.toFixed(5)} />
-                <InfoRow label="Lng" value={item.lng.toFixed(5)} />
-              </>
-            )}
-          </div>
-
-          {item.last_actor && (
-            <div className="flex items-center gap-2 text-xs bg-[#0F6E56]/5 border border-[#0F6E56]/20 rounded-lg px-3 py-2 mb-3">
-              <ShieldCheck size={13} className="text-[#0F6E56] flex-shrink-0" />
-              <span className="text-gray-600">
-                <span className="font-semibold text-[#0F6E56]">
-                  {item.last_actor.nombre || item.last_actor.email.split('@')[0]}
-                </span>
-                {' '}se hizo cargo · {item.last_actor.email}
-              </span>
+          {/* Mini mapa */}
+          {tieneUbicacion && (
+            <div>
+              <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2 flex items-center gap-1">
+                <MapPin size={10} /> Ubicación del reporte
+              </p>
+              <MiniMapa lat={denuncia.latitud!} lng={denuncia.longitud!} nivel={denuncia.nivel_riesgo} />
             </div>
           )}
 
-          {item.comentarios && (
-            <p className="text-xs text-gray-600 italic bg-white rounded-lg px-3 py-2 border border-gray-100 mb-3">
-              "{item.comentarios}"
-            </p>
+          {/* Evidencia */}
+          <Evidencia fotoUrl={denuncia.foto_url} audioUrl={denuncia.audio_url} />
+
+          {/* Sin evidencia */}
+          {!denuncia.foto_url && !denuncia.audio_url && !tieneUbicacion && (
+            <div className="flex items-center gap-2 text-xs text-[#B09CC8] bg-white rounded-xl px-3 py-2 border border-[#EBE3F9]">
+              <ImageOff size={13} /> Sin evidencia adjunta ni ubicación
+            </div>
           )}
 
-          {!esCerrado && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 mb-2">Cambiar estado:</p>
-              <div className="flex flex-wrap gap-2">
-                {ESTADOS_ACCION.filter((e) => e.value !== item.estado).map((e) => (
-                  <button
-                    key={e.value}
-                    disabled={isPending}
-                    onClick={(ev) => { ev.stopPropagation(); cambiarEstado({ id: item.id, estado: e.value }); }}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 bg-white font-semibold text-gray-700 hover:border-[#0F6E56] hover:text-[#0F6E56] transition-all disabled:opacity-50"
-                  >
-                    {isPending ? '…' : e.label}
-                  </button>
-                ))}
+          {/* Información de la víctima */}
+          <div>
+            <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2 flex items-center gap-1">
+              <User size={10} /> Víctima
+            </p>
+            <div className="bg-white rounded-xl border border-[#EBE3F9] px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              <span className="text-[#B09CC8]">Modo</span>
+              <span className="text-[#1A0A2E] font-medium">{denuncia.es_anonima ? 'Anónima' : 'Con cuenta'}</span>
+              <span className="text-[#B09CC8]">Token</span>
+              <span className="text-[#1A0A2E] font-mono text-[10px]">{denuncia.token_anonimo}</span>
+              <span className="text-[#B09CC8]">Contacto</span>
+              <span className="text-[#1A0A2E] font-medium capitalize">{denuncia.preferencia_contacto}</span>
+              {denuncia.horario_contacto && (
+                <>
+                  <span className="text-[#B09CC8]">Horario</span>
+                  <span className="text-[#1A0A2E] font-medium">{denuncia.horario_contacto}</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Acciones — solo si no está cerrada */}
+          {!esCerrada && (
+            <>
+              {/* Cambiar estado */}
+              {nextEstados.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Estado</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {nextEstados
+                      .filter((e) => e !== 'derivada' && e !== 'cerrada')
+                      .map((e) => (
+                        <button
+                          key={e}
+                          disabled={cambiando}
+                          onClick={() => cambiarEstado({ id: denuncia.id, estado: e })}
+                          className="text-[11px] px-2.5 py-1.5 rounded-lg border border-[#DDD0F5] bg-white font-semibold text-[#5E4480] hover:border-[#8B43D4] hover:text-[#8B43D4] transition-all disabled:opacity-50"
+                        >
+                          {ESTADO_LABEL[e]}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Derivar a */}
+              <div>
+                <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Derivar a</p>
+                <div className="flex flex-wrap gap-2">
+                  {DERIVACIONES.map(({ destino, label, Icon, color }) => (
+                    <button
+                      key={destino}
+                      disabled={cambiando}
+                      onClick={() => handleDerivacion(destino)}
+                      className={`flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-xl border transition-all disabled:opacity-50 ${color}`}
+                    >
+                      <Icon size={11} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Asignar operador */}
+              {operadores && operadores.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <UserCheck size={10} /> Asignar operador
+                  </p>
+                  <select
+                    disabled={asignando}
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        asignarOperador({ id: denuncia.id, operador_id: e.target.value });
+                        e.target.value = '';
+                      }
+                    }}
+                    className="w-full text-xs border border-[#DDD0F5] rounded-xl px-3 py-2 text-[#1A0A2E] bg-white focus:outline-none focus:border-[#8B43D4] disabled:opacity-60"
+                  >
+                    <option value="">Seleccionar operador…</option>
+                    {operadores.map((op) => (
+                      <option key={op.id} value={op.id}>
+                        {op.nombre} {op.apellido}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Cerrar con motivo */}
+              {nextEstados.includes('cerrada') && (
+                <div>
+                  <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Cerrar caso</p>
+                  <div className="flex gap-2">
+                    <select
+                      value={motivoCierre}
+                      onChange={(e) => setMotivoCierre(e.target.value)}
+                      className="flex-1 text-xs border border-[#DDD0F5] rounded-xl px-3 py-2 text-[#1A0A2E] bg-white focus:outline-none focus:border-[#8B43D4]"
+                    >
+                      <option value="">Motivo de cierre…</option>
+                      <option value="Caso resuelto">Caso resuelto</option>
+                      <option value="Víctima no responde">Víctima no responde</option>
+                      <option value="Falsa alarma">Falsa alarma</option>
+                      <option value="Derivado a instancia externa">Derivado a instancia externa</option>
+                    </select>
+                    <button
+                      disabled={cambiando}
+                      onClick={handleCerrar}
+                      className="text-[11px] px-3 py-1.5 rounded-xl border border-red-200 bg-red-50 text-red-700 font-bold hover:bg-red-100 transition-all disabled:opacity-50 whitespace-nowrap"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mensaje a la víctima */}
+              <MensajeForm denunciaId={denuncia.id} />
+            </>
+          )}
+
+          {/* Caso cerrado */}
+          {esCerrada && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+              <CheckCircle size={13} className="text-gray-300" />
+              Caso cerrado — solo lectura
             </div>
           )}
         </div>
@@ -178,79 +435,73 @@ function FeedCard({ item }: { item: FeedItem }) {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="text-gray-400">{label}: </span>
-      <span className="text-gray-700 font-medium">{value}</span>
-    </div>
-  );
-}
+// ─── FeedAcciones principal ───────────────────────────────────────────────────
 
 interface Props {
   filtros: Partial<Filtros>;
 }
 
-const LIMIT_OPTIONS = [20, 50, 100];
-
 export function FeedAcciones({ filtros }: Props) {
-  const [filtroEstado, setFiltroEstado] = useState<EstadoFiltro>('enviado');
-  const [limit, setLimit] = useState(30);
-  const { data, isLoading } = useFeed(
-    filtros,
-    filtroEstado === 'todos' ? undefined : filtroEstado,
-    limit,
-  );
+  const [pagina, setPagina] = useState(1);
+  const { data, isLoading } = useDenuncias(filtros, pagina, 15);
+
+  const denuncias  = data?.data ?? [];
+  const total      = data?.total ?? 0;
+  const totalPags  = Math.max(1, Math.ceil(total / 15));
+
+  const urgentesCount = denuncias.filter((d) => d.nivel_riesgo === 'urgente' && d.estado !== 'cerrada').length;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col h-full">
+    <div className="bg-white rounded-2xl border border-[#DDD0F5] shadow-sm p-5 flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-sm font-black text-gray-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Feed de Acción
+          <h2 className="text-sm font-black text-[#1A0A2E]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            Expedientes
           </h2>
-          <p className="text-xs text-gray-400 mt-0.5">{data?.length ?? '—'} reportes</p>
+          <p className="text-xs text-[#B09CC8] mt-0.5">
+            {total} denuncias
+            {urgentesCount > 0 && (
+              <span className="ml-2 text-red-600 font-bold animate-dot-urgente inline-block">
+                · {urgentesCount} urgente{urgentesCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </p>
         </div>
-        <select
-          value={limit}
-          onChange={(e) => setLimit(Number(e.target.value))}
-          className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white focus:outline-none focus:border-[#0F6E56]"
-        >
-          {LIMIT_OPTIONS.map((n) => <option key={n} value={n}>Máx {n}</option>)}
-        </select>
-      </div>
-
-      {/* Pills de filtro */}
-      <div className="flex gap-1.5 flex-wrap mb-3">
-        {FILTROS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setFiltroEstado(value)}
-            className={`text-xs px-2.5 py-1 rounded-lg font-semibold border transition-all ${
-              filtroEstado === value
-                ? 'bg-[#0F6E56] text-white border-[#0F6E56]'
-                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {total > 15 && (
+          <div className="flex items-center gap-1 text-xs text-[#5E4480]">
+            <button
+              disabled={pagina === 1}
+              onClick={() => setPagina((p) => p - 1)}
+              className="px-2 py-1 rounded-lg border border-[#DDD0F5] disabled:opacity-40 hover:border-[#8B43D4] transition-colors"
+            >
+              ‹
+            </button>
+            <span className="px-1">{pagina}/{totalPags}</span>
+            <button
+              disabled={pagina >= totalPags}
+              onClick={() => setPagina((p) => p + 1)}
+              className="px-2 py-1 rounded-lg border border-[#DDD0F5] disabled:opacity-40 hover:border-[#8B43D4] transition-colors"
+            >
+              ›
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Lista */}
-      <div className="flex-1 overflow-y-auto space-y-2 max-h-[400px] pr-1">
+      <div className="flex-1 overflow-y-auto space-y-2 max-h-[520px] pr-0.5">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-[72px] bg-gray-100 rounded-xl animate-pulse" />
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-20 bg-[#F3EFFE] rounded-2xl animate-pulse" />
           ))
-        ) : !data?.length ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-            <CheckCircle size={28} className="mb-2 text-gray-200" />
-            <p className="text-sm">Sin reportes para este filtro</p>
+        ) : !denuncias.length ? (
+          <div className="flex flex-col items-center justify-center h-40 text-[#B09CC8]">
+            <CheckCircle size={28} className="mb-2 text-[#DDD0F5]" />
+            <p className="text-sm">Sin denuncias para este filtro</p>
           </div>
         ) : (
-          data.map((item) => <FeedCard key={item.id} item={item} />)
+          denuncias.map((d) => <ExpedienteCard key={d.id} denuncia={d} />)
         )}
       </div>
     </div>

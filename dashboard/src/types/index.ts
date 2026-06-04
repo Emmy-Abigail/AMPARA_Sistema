@@ -1,72 +1,104 @@
+// ─── Enums (espejo de app/schemas/enums.py) ───────────────────────────────────
+
+export type TipoViolencia = 'Física' | 'Psicológica' | 'Sexual' | 'Económica' | 'Otra';
+export type RelacionAgresor = 'Cónyuge' | 'Expareja' | 'Familiar' | 'Conocido' | 'Desconocido';
+export type NivelRiesgo = 'urgente' | 'alto' | 'moderado';
+export type PreferenciaContacto = 'app' | 'llamada' | 'ninguno';
+export type EstadoCaso =
+  | 'nueva'
+  | 'asignada'
+  | 'en_seguimiento'
+  | 'derivada'
+  | 'pendiente_confirmacion'
+  | 'cerrada';
+
+// ─── Respuesta envuelta de la API ─────────────────────────────────────────────
+
+export interface ApiResponse<T> {
+  data: T;
+  exito: boolean;
+  mensaje: string | null;
+}
+
+export interface PaginatedData<T> {
+  data: T[];
+  total: number;
+  pagina: number;
+  porPagina: number;
+}
+
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
+
 export interface KpisData {
-  total_reportes: number;
-  reportes_con_larvas: number;
-  casos_sospechosos: number;
-  casos_confirmados: number;
-}
-
-export interface ReporteMapa {
-  id: string;
-  lat: number;
-  lng: number;
-  tipo_lugar: string;
-  tipo_objeto: string;
-  observa_larvas: string;
-  estado: string;
-  foto_url: string | null;
-  comentarios: string | null;
-  direccion: string | null;
-  fecha_reporte: string;
-  reporter: { nombre: string; departamento: string; provincia: string; distrito: string };
-}
-
-export interface NotiMapa {
-  departamento: string;
-  provincia: string;
-  ubigeo: string;
-  tipo_diagnostico: string;
   total: number;
+  activas: number;
+  urgentes: number;
+  hoy: number;
+  por_estado: Record<EstadoCaso, number>;
+  por_tipo: Record<TipoViolencia, number>;
+  tendencia: { fecha: string; total: number }[];
 }
 
-export interface NetlabMapa {
-  departamento: string;
-  provincia: string;
-  distrito: string;
-  ubigeo: string;
-  serotipo: string | null;
-  total: number;
-}
+// ─── Denuncia ─────────────────────────────────────────────────────────────────
 
-export interface FeedItem {
+export interface Denuncia {
   id: string;
-  tipo_lugar: string;
-  tipo_objeto: string;
-  observa_larvas: string;
-  conocimiento_dengue_cercano: string | null;
-  comentarios: string | null;
-  estado: string;
+  token_anonimo: string;
+  tipo_violencia: TipoViolencia;
+  relacion_agresor: RelacionAgresor;
+  nivel_riesgo: NivelRiesgo;
+  hay_heridos: boolean;
   foto_url: string | null;
-  lat: number;
-  lng: number;
-  direccion: string | null;
-  fecha_reporte: string;
+  audio_url: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  preferencia_contacto: PreferenciaContacto;
+  horario_contacto: string | null;
+  es_anonima: boolean;
+  estado: EstadoCaso;
+  fecha_denuncia: string;
   fecha_actualizacion: string;
-  reporter: { nombre: string; email: string; departamento: string; provincia: string; distrito: string };
-  last_actor: { nombre: string | null; email: string } | null;
 }
 
-export interface TendenciasData {
-  reportes: { semana: string; total: number }[];
-  noti: { ano: number; semana_epi: number; total: number }[];
-  netlab: { semana: string; total: number }[];
+// ─── Mapa ─────────────────────────────────────────────────────────────────────
+
+export interface DenunciaMapa {
+  id: string;
+  lat: number;
+  lng: number;
+  nivel_riesgo: NivelRiesgo;
+  tipo_violencia: TipoViolencia;
+  hay_heridos: boolean;
+  estado: EstadoCaso;
 }
+
+// ─── Operadores ───────────────────────────────────────────────────────────────
+
+export interface Operador {
+  id: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+}
+
+// ─── Mensaje operador ↔ víctima ───────────────────────────────────────────────
+
+export interface MensajeResponse {
+  id: string;
+  denuncia_id: string;
+  autor: 'operador' | 'sistema';
+  contenido: string;
+  destruir_al_leer: boolean;
+  leido: boolean;
+  created_at: string;
+}
+
+// ─── Filtros del dashboard ────────────────────────────────────────────────────
 
 export interface Filtros {
   fecha_desde: string;
   fecha_hasta: string;
-  departamento: string;
-  provincia: string;
-  distrito: string;
+  estado: EstadoCaso;
+  nivel_riesgo: NivelRiesgo;
+  tipo_violencia: TipoViolencia;
 }
-
-export type EstadoReporte = 'enviado' | 'en_revision' | 'resuelto' | 'rechazado' | 'cancelado';

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { obtenerCasosLocales, type CasoLocal } from '../services/casosLocales';
 import type { Denuncia, EstadoCaso, NivelRiesgo, PreferenciaContacto, TipoViolencia, RelacionAgresor } from '../types';
 
-// Convierte el shape local al tipo Denuncia que usan las cards del dashboard móvil
 export function casoLocalADenuncia(c: CasoLocal): Denuncia {
   return {
     id:                   c.denuncia_id ?? c.local_id,
@@ -13,6 +12,7 @@ export function casoLocalADenuncia(c: CasoLocal): Denuncia {
     hay_heridos:          c.hay_heridos,
     foto_url:             c.foto_url ?? undefined,
     preferencia_contacto: 'ninguno' as PreferenciaContacto,
+    descripcion:          c.descripcion ?? undefined,
     es_anonima:           c.es_anonima,
     estado:               c.estado as EstadoCaso,
     fecha_denuncia:       c.fecha_denuncia,
@@ -21,7 +21,7 @@ export function casoLocalADenuncia(c: CasoLocal): Denuncia {
 }
 
 export function useCasosLocales() {
-  const [casos, setCasos] = useState<CasoLocal[]>([]);
+  const [casos, setCasos]       = useState<CasoLocal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const cargar = useCallback(async () => {

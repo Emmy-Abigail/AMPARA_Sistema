@@ -1,4 +1,36 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="10" fill="#0F6E56"/>
-  <text x="24" y="36" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-weight="800" font-size="34" fill="white">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="bg" cx="40%" cy="30%" r="70%">
+      <stop offset="0%"   stop-color="#B07BE6"/>
+      <stop offset="100%" stop-color="#3B1A6B"/>
+    </radialGradient>
+    <clipPath id="circle">
+      <circle cx="32" cy="32" r="30"/>
+    </clipPath>
+  </defs>
+
+  <!-- Fondo circular con gradiente -->
+  <circle cx="32" cy="32" r="32" fill="url(#bg)"/>
+
+  <!-- Silueta mujer — mano abierta (base) -->
+  <path clip-path="url(#circle)"
+    d="M18 52 C18 44 22 40 28 39 L30 38 C32 37 33 35 33 33 L33 26 C33 24 34 23 35.5 23 C37 23 38 24 38 26 L38 36 C39 35 40.5 35 41.5 36 L41.5 37 C42.5 36 44 36.5 44 38 L44 39 C45 38.5 46 39.5 46 41 L46 46 C46 50 43 54 38 54 L22 54 Z"
+    fill="rgba(255,255,255,0.82)"
+  />
+
+  <!-- Corazón en la mano -->
+  <path clip-path="url(#circle)"
+    d="M33.5 31 C33.5 29.5 34.5 28.5 36 28.5 C37 28.5 37.8 29.1 38.2 29.9 C38.6 29.1 39.4 28.5 40.4 28.5 C41.9 28.5 42.9 29.5 42.9 31 C42.9 33.5 38.2 36 38.2 36 C38.2 36 33.5 33.5 33.5 31 Z"
+    fill="rgba(255,255,255,0.95)"
+  />
+
+  <!-- Silueta cabeza y cabello -->
+  <ellipse cx="27" cy="20" rx="7" ry="8" fill="rgba(255,255,255,0.85)" clip-path="url(#circle)"/>
+  <!-- Cabello fluido -->
+  <path clip-path="url(#circle)"
+    d="M20 18 C18 14 19 8 24 7 C21 9 21 14 22 18 Z M33 16 C36 12 37 7 32 5 C35 8 34 13 33 16 Z"
+    fill="rgba(255,255,255,0.7)"
+  />
+  <!-- Cuello -->
+  <rect clip-path="url(#circle)" x="24" y="27" width="6" height="6" rx="2" fill="rgba(255,255,255,0.8)"/>
 </svg>

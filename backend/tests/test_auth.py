@@ -64,7 +64,7 @@ async def test_refresh_con_access_token_rechazado(client: AsyncClient):
 
 async def test_endpoint_protegido_sin_token(client: AsyncClient):
     """Endpoints que requieren autenticación devuelven 403 sin token."""
-    r = await client.get("/api/v1/denuncias/mis-denuncias")
+    r = await client.get("/api/v1/dashboard/stats")
     assert r.status_code == 403
 
 

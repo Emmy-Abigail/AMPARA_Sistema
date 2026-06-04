@@ -1,93 +1,110 @@
+// src - useDashboard.ts
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi } from '../api/endpoints';
-import type { Filtros } from '../types';
+import type { EstadoCaso, Filtros } from '../types';
+
+// ─── Query keys ───────────────────────────────────────────────────────────────
 
 const keys = {
-  kpis: (f: Partial<Filtros>) => ['kpis', f] as const,
-  mapaReportes: (f: Partial<Filtros>) => ['mapa-reportes', f] as const,
-  mapaNoti: (f: Partial<Filtros>) => ['mapa-noti', f] as const,
-  mapaNetlab: (f: Partial<Filtros>) => ['mapa-netlab', f] as const,
-  feed: (f: Partial<Filtros>, estado: string) => ['feed', f, estado] as const,
-  feedAlertas: () => ['feed-alertas'] as const,
-  tendencias: (f: Partial<Filtros>) => ['tendencias', f] as const,
-  ubicaciones: ['ubicaciones'] as const,
+  kpis:        (f: Partial<Filtros>) => ['kpis', f]              as const,
+  mapa:        ()                    => ['mapa']                  as const,
+  denuncias:   (f: Partial<Filtros>, pagina: number) =>
+                                        ['denuncias', f, pagina]  as const,
+  operadores:  ()                    => ['operadores']             as const,
 };
 
 const REFETCH_INTERVAL = 60_000; // 1 min
 
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
+
 export function useKpis(filtros: Partial<Filtros>) {
   return useQuery({
     queryKey: keys.kpis(filtros),
-    queryFn: () => dashboardApi.kpis(filtros),
+    queryFn:  () => dashboardApi.kpis(filtros),
     refetchInterval: REFETCH_INTERVAL,
   });
 }
 
-export function useMapaReportes(filtros: Partial<Filtros>) {
+// ─── Mapa ─────────────────────────────────────────────────────────────────────
+
+export function useMapaDenuncias() {
   return useQuery({
-    queryKey: keys.mapaReportes(filtros),
-    queryFn: () => dashboardApi.mapaReportes(filtros),
+    queryKey: keys.mapa(),
+    queryFn:  dashboardApi.mapaDenuncias,
     staleTime: 30_000,
-  });
-}
-
-export function useMapaNoti(filtros: Partial<Filtros>) {
-  return useQuery({
-    queryKey: keys.mapaNoti(filtros),
-    queryFn: () => dashboardApi.mapaNoti(filtros),
-    staleTime: 60_000,
-  });
-}
-
-export function useMapaNetlab(filtros: Partial<Filtros>) {
-  return useQuery({
-    queryKey: keys.mapaNetlab(filtros),
-    queryFn: () => dashboardApi.mapaNetlab(filtros),
-    staleTime: 60_000,
-  });
-}
-
-export function useFeed(filtros: Partial<Filtros>, estado?: string, limit = 30) {
-  return useQuery({
-    queryKey: keys.feed(filtros, estado ?? 'todos'),
-    queryFn: () => dashboardApi.feed(filtros, limit, estado),
     refetchInterval: REFETCH_INTERVAL,
   });
 }
 
-export function useFeedAlertas() {
+// ─── Feed de denuncias ────────────────────────────────────────────────────────
+
+export function useDenuncias(
+  filtros: Partial<Filtros>,
+  pagina = 1,
+  porPagina = 30,
+) {
   return useQuery({
-    queryKey: keys.feedAlertas(),
-    queryFn: () => dashboardApi.feed({}, 50, 'enviado'),
-    refetchInterval: 30_000,
+    queryKey: keys.denuncias(filtros, pagina),
+    queryFn:  () => dashboardApi.denuncias(filtros, pagina, porPagina),
+    refetchInterval: REFETCH_INTERVAL,
   });
 }
 
-export function useTendencias(filtros: Partial<Filtros>) {
-  return useQuery({
-    queryKey: keys.tendencias(filtros),
-    queryFn: () => dashboardApi.tendencias(filtros),
-    staleTime: 5 * 60_000,
-  });
-}
+// ─── Operadores ───────────────────────────────────────────────────────────────
 
-export function useUbicaciones() {
+export function useOperadores() {
   return useQuery({
-    queryKey: keys.ubicaciones,
-    queryFn: dashboardApi.ubicaciones,
+    queryKey: keys.operadores(),
+    queryFn:  dashboardApi.operadores,
     staleTime: Infinity,
   });
 }
 
-export function useActualizarEstado() {
+// ─── Mutaciones ───────────────────────────────────────────────────────────────
+
+export function useCambiarEstado() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, estado }: { id: string; estado: string }) =>
-      dashboardApi.actualizarEstado(id, estado),
+    mutationFn: ({
+      id,
+      estado,
+      motivo_cierre,
+    }: {
+      id: string;
+      estado: EstadoCaso;
+      motivo_cierre?: string;
+    }) => dashboardApi.cambiarEstado(id, estado, motivo_cierre),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['feed'] });
-      qc.invalidateQueries({ queryKey: ['mapa-reportes'] });
+      qc.invalidateQueries({ queryKey: ['denuncias'] });
+      qc.invalidateQueries({ queryKey: ['mapa'] });
       qc.invalidateQueries({ queryKey: ['kpis'] });
     },
+  });
+}
+
+export function useAsignarOperador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, operador_id }: { id: string; operador_id: string }) =>
+      dashboardApi.asignarOperador(id, operador_id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['denuncias'] });
+      qc.invalidateQueries({ queryKey: ['kpis'] });
+    },
+  });
+}
+
+export function useSendMensaje() {
+  return useMutation({
+    mutationFn: ({
+      denunciaId,
+      contenido,
+      destruirAlLeer,
+    }: {
+      denunciaId: string;
+      contenido: string;
+      destruirAlLeer: boolean;
+    }) => dashboardApi.sendMensaje(denunciaId, contenido, destruirAlLeer),
   });
 }

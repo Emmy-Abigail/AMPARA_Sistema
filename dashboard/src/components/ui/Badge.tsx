@@ -1,16 +1,17 @@
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'red' | 'yellow' | 'green' | 'blue' | 'gray' | 'orange';
+  variant?: 'red' | 'yellow' | 'green' | 'blue' | 'gray' | 'orange' | 'purple';
   size?: 'sm' | 'md';
 }
 
 const variants = {
-  red: 'bg-red-100 text-red-700',
+  red:    'bg-red-100 text-red-700',
   yellow: 'bg-yellow-100 text-yellow-700',
-  green: 'bg-emerald-100 text-emerald-700',
-  blue: 'bg-blue-100 text-blue-700',
-  gray: 'bg-gray-100 text-gray-600',
+  green:  'bg-emerald-100 text-emerald-700',
+  blue:   'bg-blue-100 text-blue-700',
+  gray:   'bg-gray-100 text-gray-600',
   orange: 'bg-orange-100 text-orange-700',
+  purple: 'bg-[#F3EFFE] text-[#6E2DB0]',
 };
 
 export function Badge({ children, variant = 'gray', size = 'sm' }: BadgeProps) {

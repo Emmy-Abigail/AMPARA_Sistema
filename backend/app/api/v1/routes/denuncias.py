@@ -1,11 +1,14 @@
+import secrets
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile, File, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, UploadFile, File, status
 from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
-from sqlalchemy import select
+from jose import jwt, JWTError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.security import get_current_user
@@ -19,16 +22,13 @@ from app.services.storage import storage
 
 router = APIRouter(tags=["Denuncias"])
 
+_TOKEN_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _get_optional_user(
-    authorization: Optional[str] = Header(default=None),
-):
-    """Intenta extraer el usuario del token; retorna None si no hay token.
-    Permite que el endpoint acepte tanto requests autenticados como anónimos.
-    """
-    return authorization  # procesado manualmente en el endpoint
+def _generar_token_anonimo() -> str:
+    parte1 = "".join(secrets.choice(_TOKEN_CHARS) for _ in range(4))
+    parte2 = "".join(secrets.choice(_TOKEN_CHARS) for _ in range(4))
+    return f"AMP-{parte1}-{parte2}"
 
 
 async def _resolve_optional_user(
@@ -39,15 +39,15 @@ async def _resolve_optional_user(
         return None
     token = authorization.split(" ", 1)[1]
     try:
-        from jose import jwt, JWTError
-        from app.core.config import settings
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "access":
+            return None
         email: str | None = payload.get("sub")
         if not email:
             return None
         result = await db.execute(select(Usuario).where(Usuario.email == email))
         return result.scalar_one_or_none()
-    except Exception:
+    except (JWTError, Exception):
         return None
 
 
@@ -65,7 +65,7 @@ async def subir_foto(
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Formato de imagen no soportado")
 
     contenido = await foto.read()
-    if len(contenido) > 15 * 1024 * 1024:  # 15 MB
+    if len(contenido) > 15 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="La imagen supera 15 MB")
 
     try:
@@ -91,7 +91,7 @@ async def subir_audio(
         raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Formato de audio no soportado")
 
     contenido = await audio.read()
-    if len(contenido) > 20 * 1024 * 1024:  # 20 MB
+    if len(contenido) > 20 * 1024 * 1024:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="El audio supera 20 MB")
 
     try:
@@ -112,34 +112,28 @@ async def crear_denuncia(
     authorization: Optional[str] = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    # Idempotencia: si ya existe una denuncia con el mismo device_id + local_id, devuelve la existente
+    # Idempotencia: mismo (device_id, local_id) devuelve la denuncia existente
     if data.device_id and data.local_id:
         result = await db.execute(
             select(Denuncia).where(
                 Denuncia.device_id == data.device_id,
-                Denuncia.local_id == data.local_id,
+                Denuncia.local_id  == data.local_id,
             )
         )
         existente = result.scalar_one_or_none()
         if existente:
             return ApiResponse(data=DenunciaResponse.model_validate(existente))
 
-    # Resolver usuario si hay token
     usuario = await _resolve_optional_user(authorization, db)
 
-    # Verificar unicidad del token_anonimo si viene del cliente
     token_anonimo = data.token_anonimo
     if token_anonimo:
         result = await db.execute(select(Denuncia).where(Denuncia.token_anonimo == token_anonimo))
         if result.scalar_one_or_none():
-            # Token ya usado (muy improbable) — generar uno nuevo en el servidor
             token_anonimo = None
 
     if not token_anonimo:
-        # Generar token en el servidor
-        import random, string
-        chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-        token_anonimo = "AMP-" + "".join(random.choices(chars, k=4)) + "-" + "".join(random.choices(chars, k=4))
+        token_anonimo = _generar_token_anonimo()
 
     nivel_riesgo = _calcular_nivel_riesgo(data.relacion_agresor.value, data.hay_heridos)
 
@@ -161,7 +155,6 @@ async def crear_denuncia(
         es_anonima=           usuario is None,
     )
 
-    # Construir punto PostGIS si hay coordenadas
     if data.latitud is not None and data.longitud is not None:
         denuncia.ubicacion = ST_SetSRID(ST_MakePoint(data.longitud, data.latitud), 4326)
 
@@ -179,16 +172,13 @@ async def crear_denuncia(
 
 @router.get("/mis-denuncias", response_model=ApiResponse[PaginatedData[DenunciaResumen]])
 async def mis_denuncias(
-    pagina: int = 1,
-    porPagina: int = 20,
+    pagina:    int = Query(1, ge=1),
+    porPagina: int = Query(20, ge=1, le=100),
     authorization: Optional[str] = Header(default=None),
     device_id: Optional[str] = Header(default=None, alias="X-Device-Id"),
     db: AsyncSession = Depends(get_db),
 ):
-    if pagina < 1:
-        pagina = 1
-    offset = (pagina - 1) * porPagina
-
+    offset  = (pagina - 1) * porPagina
     usuario = await _resolve_optional_user(authorization, db)
 
     if usuario:
@@ -198,8 +188,7 @@ async def mis_denuncias(
     else:
         return ApiResponse(data=PaginatedData(data=[], total=0, pagina=pagina, porPagina=porPagina))
 
-    from sqlalchemy import func as sqlfunc
-    count_result = await db.execute(select(sqlfunc.count()).select_from(base_q.subquery()))
+    count_result = await db.execute(select(func.count()).select_from(base_q.subquery()))
     total = count_result.scalar_one()
 
     result = await db.execute(
@@ -209,9 +198,7 @@ async def mis_denuncias(
 
     return ApiResponse(data=PaginatedData(
         data=[DenunciaResumen.model_validate(d) for d in denuncias],
-        total=total,
-        pagina=pagina,
-        porPagina=porPagina,
+        total=total, pagina=pagina, porPagina=porPagina,
     ))
 
 
@@ -239,11 +226,10 @@ async def get_denuncia(
     if not denuncia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
 
-    # Verificar acceso: propietario, operador asignado o admin
-    usuario = await _resolve_optional_user(authorization, db)
-    es_propietario   = usuario and denuncia.usuario_id == usuario.id
-    es_operador_adm  = usuario and usuario.rol in ("operador", "admin")
-    if not es_propietario and not es_operador_adm:
+    usuario        = await _resolve_optional_user(authorization, db)
+    es_propietario = usuario and denuncia.usuario_id == usuario.id
+    es_staff       = usuario and usuario.rol in ("operador", "admin")
+    if not es_propietario and not es_staff:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta denuncia")
 
     return ApiResponse(data=DenunciaResponse.model_validate(denuncia))
@@ -262,10 +248,10 @@ async def get_mensajes(
     if not denuncia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
 
-    usuario = await _resolve_optional_user(authorization, db)
-    es_propietario  = usuario and denuncia.usuario_id == usuario.id
-    es_operador_adm = usuario and usuario.rol in ("operador", "admin")
-    if not es_propietario and not es_operador_adm:
+    usuario        = await _resolve_optional_user(authorization, db)
+    es_propietario = usuario and denuncia.usuario_id == usuario.id
+    es_staff       = usuario and usuario.rol in ("operador", "admin")
+    if not es_propietario and not es_staff:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso")
 
     result = await db.execute(
@@ -292,7 +278,6 @@ async def marcar_leido(
 
     mensaje.leido = True
 
-    # Destruir el contenido si está marcado para autodestrucción
     if mensaje.destruir_al_leer:
         mensaje.contenido = "[Mensaje eliminado]"
 

@@ -1,4 +1,6 @@
-import { Bug, AlertTriangle, FlaskConical, MapPin } from 'lucide-react';
+// components - KpiCards.tsx
+
+import { ShieldAlert, AlertOctagon, Activity, CalendarCheck } from 'lucide-react';
 import { useKpis } from '../hooks/useDashboard';
 import type { Filtros } from '../types';
 
@@ -23,7 +25,10 @@ function KpiCard({ label, value, icon, color, bgColor, loading, delta }: KpiCard
         {loading ? (
           <div className="h-8 w-16 bg-gray-100 rounded-lg animate-pulse" />
         ) : (
-          <p className="text-3xl font-black text-gray-900 leading-none" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+          <p
+            className="text-3xl font-black text-gray-900 leading-none"
+            style={{ fontFamily: 'Montserrat, sans-serif' }}
+          >
             {value.toLocaleString()}
           </p>
         )}
@@ -44,34 +49,35 @@ export function KpiCards({ filtros }: Props) {
 
   const cards = [
     {
-      label: 'Total Reportes Ciudadanos',
-      value: data?.total_reportes ?? 0,
-      icon: <MapPin size={22} />,
-      color: 'text-[#0F6E56]',
-      bgColor: 'bg-[#0F6E56]/10',
+      label:   'Total Denuncias',
+      value:   data?.total ?? 0,
+      icon:    <ShieldAlert size={22} />,
+      color:   'text-[#8B43D4]',
+      bgColor: 'bg-[#8B43D4]/10',
+      delta:   'Todas las denuncias registradas',
     },
     {
-      label: 'Reportes con Larvas',
-      value: data?.reportes_con_larvas ?? 0,
-      icon: <Bug size={22} />,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      delta: 'Alerta temprana',
+      label:   'Casos Activos',
+      value:   data?.activas ?? 0,
+      icon:    <Activity size={22} />,
+      color:   'text-blue-600',
+      bgColor: 'bg-blue-50',
+      delta:   'Sin cerrar',
     },
     {
-      label: 'Casos Sospechosos (NOTI)',
-      value: data?.casos_sospechosos ?? 0,
-      icon: <AlertTriangle size={22} />,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50',
-    },
-    {
-      label: 'Casos Confirmados (NETLAB)',
-      value: data?.casos_confirmados ?? 0,
-      icon: <FlaskConical size={22} />,
-      color: 'text-red-600',
+      label:   'Casos Urgentes',
+      value:   data?.urgentes ?? 0,
+      icon:    <AlertOctagon size={22} />,
+      color:   'text-red-600',
       bgColor: 'bg-red-50',
-      delta: 'PCR positivo',
+      delta:   'Requieren atención inmediata',
+    },
+    {
+      label:   'Denuncias Hoy',
+      value:   data?.hoy ?? 0,
+      icon:    <CalendarCheck size={22} />,
+      color:   'text-orange-600',
+      bgColor: 'bg-orange-50',
     },
   ];
 

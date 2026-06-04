@@ -18,8 +18,8 @@ class DenunciaCreate(BaseModel):
     hay_heridos:          bool
     foto_url:             str | None = None
     audio_url:            str | None = None
-    latitud:              float | None = None
-    longitud:             float | None = None
+    latitud:              float | None = Field(None, ge=-90.0,  le=90.0)
+    longitud:             float | None = Field(None, ge=-180.0, le=180.0)
     preferencia_contacto: PreferenciaContactoEnum = PreferenciaContactoEnum.NINGUNO
     horario_contacto:     str | None = Field(None, max_length=100)
     device_id:            str | None = Field(None, max_length=64)

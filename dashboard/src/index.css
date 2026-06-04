@@ -1,21 +1,72 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@700;800&display=swap');
 @import "tailwindcss";
 
+/* ─── Tema Ampara ──────────────────────────────────────────────────────────── */
+
+@theme {
+  --color-ampara-50:  #F3EFFE;
+  --color-ampara-100: #E9DDFB;
+  --color-ampara-200: #D4BBF7;
+  --color-ampara-300: #B07BE6;
+  --color-ampara-400: #9B5CE0;
+  --color-ampara-500: #8B43D4;
+  --color-ampara-600: #7533BB;
+  --color-ampara-700: #6E2DB0;
+  --color-ampara-800: #5B2FA0;
+  --color-ampara-900: #3B1A6B;
+}
+
 * { box-sizing: border-box; }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #f0f4f2;
-  color: #1a2e25;
+  background-color: #F8F5FE;
+  color: #1A0A2E;
   margin: 0;
 }
+
+/* ─── Scrollbar ────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #F3EFFE; }
+::-webkit-scrollbar-thumb { background: #C4A8E8; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #8B43D4; }
+
+/* ─── Leaflet ──────────────────────────────────────────────────────────────── */
 
 .leaflet-container {
   z-index: 1;
   border-radius: 0.75rem;
+  font-family: 'Inter', sans-serif;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #f0f4f2; }
-::-webkit-scrollbar-thumb { background: #b8cfc8; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #0F6E56; }
+/* ─── Alerta urgente — anillo pulsante ─────────────────────────────────────── */
+
+@keyframes pulse-urgente {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.45); }
+  60%       { box-shadow: 0 0 0 8px rgba(211, 47, 47, 0); }
+}
+
+.animate-pulse-urgente {
+  animation: pulse-urgente 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot-urgente {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(1.5); }
+}
+
+.animate-dot-urgente {
+  animation: pulse-dot-urgente 1.4s ease-in-out infinite;
+}
+
+/* ─── Expansión de expediente ──────────────────────────────────────────────── */
+
+.expediente-expand {
+  animation: slideDown 0.18s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

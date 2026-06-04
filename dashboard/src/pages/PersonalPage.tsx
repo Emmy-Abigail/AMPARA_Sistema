@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale';
 function usePersonal() {
   return useQuery({
     queryKey: ['personal'],
-    queryFn: () => api.get('/dashboard/personal').then((r) => r.data),
+    queryFn: () => api.get('/dashboard/personal').then((r) => r.data.data),
   });
 }
 
@@ -17,7 +17,7 @@ function useCrearPersonal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { nombre: string; email: string; password: string; rol: string }) =>
-      api.post('/dashboard/personal', data).then((r) => r.data),
+      api.post('/dashboard/personal', data).then((r) => r.data.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['personal'] }),
   });
 }
@@ -35,7 +35,7 @@ export function PersonalPage() {
   const { mutate: crear, isPending: creando, error: errorCrear } = useCrearPersonal();
   const { mutate: toggle } = useTogglePersonal();
 
-  const [form, setForm] = useState({ nombre: '', email: '', password: '', rol: 'inspector' });
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', rol: 'operador' });
   const [showPass, setShowPass] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -45,7 +45,7 @@ export function PersonalPage() {
     crear(form, {
       onSuccess: (u) => {
         setSuccess(`Cuenta creada para ${u.nombre}`);
-        setForm({ nombre: '', email: '', password: '', rol: 'inspector' });
+        setForm({ nombre: '', email: '', password: '', rol: 'operador' });
       },
     });
   };
@@ -57,8 +57,8 @@ export function PersonalPage() {
       {/* Crear nuevo */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-[#0F6E56]/10 flex items-center justify-center">
-            <UserPlus size={18} className="text-[#0F6E56]" />
+          <div className="w-9 h-9 rounded-xl bg-[#8B43D4]/10 flex items-center justify-center">
+            <UserPlus size={18} className="text-[#8B43D4]" />
           </div>
           <div>
             <h2 className="text-sm font-black text-gray-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -87,7 +87,7 @@ export function PersonalPage() {
               value={form.nombre}
               onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
               placeholder="Ej: Carlos Ramírez"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/20"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20"
             />
           </div>
           <div>
@@ -97,8 +97,8 @@ export function PersonalPage() {
               type="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              placeholder="inspector@minsa.gob.pe"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/20"
+              placeholder="operador@ampara.pe"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20"
             />
           </div>
           <div>
@@ -111,7 +111,7 @@ export function PersonalPage() {
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 placeholder="Mínimo 8 caracteres"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/20"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20"
               />
               <button type="button" onClick={() => setShowPass((s) => !s)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -124,9 +124,9 @@ export function PersonalPage() {
             <select
               value={form.rol}
               onChange={(e) => setForm((f) => ({ ...f, rol: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#0F6E56] focus:ring-2 focus:ring-[#0F6E56]/20 bg-white"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20 bg-white"
             >
-              <option value="inspector">Inspector</option>
+              <option value="operador">Operador</option>
               <option value="admin">Administrador</option>
             </select>
           </div>
@@ -134,7 +134,7 @@ export function PersonalPage() {
             <button
               type="submit"
               disabled={creando}
-              className="bg-[#0F6E56] hover:bg-[#0a5542] text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 disabled:opacity-70"
+              className="bg-[#8B43D4] hover:bg-[#5B2FA0] text-white text-sm font-bold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 disabled:opacity-70"
             >
               {creando ? (
                 <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Creando...</>
@@ -164,10 +164,11 @@ export function PersonalPage() {
           <div className="space-y-2">
             {personal?.map((u: any) => (
               <div key={u.id} className="flex items-center gap-4 p-4 border border-gray-100 rounded-xl hover:border-gray-200 transition-all">
-                <div className="w-10 h-10 rounded-xl bg-[#0F6E56]/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-[#8B43D4]/10 flex items-center justify-center flex-shrink-0">
                   {u.rol === 'admin'
-                    ? <ShieldCheck size={18} className="text-[#0F6E56]" />
-                    : <Shield size={18} className="text-blue-500" />}
+                    ? <ShieldCheck size={18} className="text-[#8B43D4]" />
+                    : <Shield size={18} className="text-blue-500" />
+}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900">{u.nombre}</p>
@@ -175,7 +176,7 @@ export function PersonalPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant={u.rol === 'admin' ? 'green' : 'blue'} size="md">
-                    {u.rol === 'admin' ? 'Administrador' : 'Inspector'}
+                    {u.rol === 'admin' ? 'Administrador' : 'Operador'}
                   </Badge>
                   <Badge variant={u.esActivo !== false ? 'green' : 'gray'}>
                     {u.esActivo !== false ? 'Activo' : 'Inactivo'}
@@ -185,11 +186,11 @@ export function PersonalPage() {
                   </span>
                   <button
                     onClick={() => toggle(u.id)}
-                    className="text-gray-400 hover:text-[#0F6E56] transition-colors"
+                    className="text-gray-400 hover:text-[#8B43D4] transition-colors"
                     title={u.esActivo !== false ? 'Desactivar' : 'Activar'}
                   >
                     {u.esActivo !== false
-                      ? <ToggleRight size={22} className="text-[#0F6E56]" />
+                      ? <ToggleRight size={22} className="text-[#8B43D4]" />
                       : <ToggleLeft size={22} />}
                   </button>
                 </div>

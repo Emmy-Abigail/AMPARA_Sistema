@@ -1,24 +1,44 @@
 import { Filter, X } from 'lucide-react';
-import type { Filtros } from '../types';
-import { useUbicaciones } from '../hooks/useDashboard';
+import type { Filtros, EstadoCaso, NivelRiesgo, TipoViolencia } from '../types';
 
 interface FiltrosBarProps {
   filtros: Partial<Filtros>;
   onChange: (f: Partial<Filtros>) => void;
 }
 
-export function FiltrosBar({ filtros, onChange }: FiltrosBarProps) {
-  const { data: ubicData } = useUbicaciones();
-  const departamentos = ubicData?.departamentos ?? [];
+const ESTADOS: { value: EstadoCaso; label: string }[] = [
+  { value: 'nueva',                  label: 'Nueva' },
+  { value: 'asignada',               label: 'Asignada' },
+  { value: 'en_seguimiento',         label: 'En seguimiento' },
+  { value: 'derivada',               label: 'Derivada' },
+  { value: 'pendiente_confirmacion', label: 'Pendiente' },
+  { value: 'cerrada',                label: 'Cerrada' },
+];
 
-  const set = (key: keyof Filtros, val: string) => onChange({ ...filtros, [key]: val });
+const NIVELES: { value: NivelRiesgo; label: string }[] = [
+  { value: 'urgente',  label: 'Urgente' },
+  { value: 'alto',     label: 'Alto' },
+  { value: 'moderado', label: 'Moderado' },
+];
+
+const TIPOS: { value: TipoViolencia; label: string }[] = [
+  { value: 'Física',      label: 'Física' },
+  { value: 'Psicológica', label: 'Psicológica' },
+  { value: 'Sexual',      label: 'Sexual' },
+  { value: 'Económica',   label: 'Económica' },
+  { value: 'Otra',        label: 'Otra' },
+];
+
+export function FiltrosBar({ filtros, onChange }: FiltrosBarProps) {
+  const set = (key: keyof Filtros, val: string) =>
+    onChange({ ...filtros, [key]: val || undefined });
   const clear = () => onChange({});
   const hasFilters = Object.values(filtros).some(Boolean);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <Filter size={15} className="text-[#0F6E56]" />
+        <Filter size={15} className="text-[#8B43D4]" />
         <span className="text-sm font-semibold text-gray-700">Filtros</span>
         {hasFilters && (
           <button
@@ -36,7 +56,7 @@ export function FiltrosBar({ filtros, onChange }: FiltrosBarProps) {
             type="date"
             value={filtros.fecha_desde ?? ''}
             onChange={(e) => set('fecha_desde', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#0F6E56] focus:ring-1 focus:ring-[#0F6E56]/30"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#8B43D4] focus:ring-1 focus:ring-[#8B43D4]/30"
           />
         </div>
         <div>
@@ -45,41 +65,41 @@ export function FiltrosBar({ filtros, onChange }: FiltrosBarProps) {
             type="date"
             value={filtros.fecha_hasta ?? ''}
             onChange={(e) => set('fecha_hasta', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#0F6E56] focus:ring-1 focus:ring-[#0F6E56]/30"
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#8B43D4] focus:ring-1 focus:ring-[#8B43D4]/30"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-medium block mb-1">Departamento</label>
+          <label className="text-xs text-gray-500 font-medium block mb-1">Estado</label>
           <select
-            value={filtros.departamento ?? ''}
-            onChange={(e) => set('departamento', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#0F6E56] focus:ring-1 focus:ring-[#0F6E56]/30 bg-white"
+            value={filtros.estado ?? ''}
+            onChange={(e) => set('estado', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#8B43D4] focus:ring-1 focus:ring-[#8B43D4]/30 bg-white"
           >
             <option value="">Todos</option>
-            {departamentos.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
+            {ESTADOS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-medium block mb-1">Provincia</label>
-          <input
-            type="text"
-            placeholder="Ej: Iquitos"
-            value={filtros.provincia ?? ''}
-            onChange={(e) => set('provincia', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#0F6E56] focus:ring-1 focus:ring-[#0F6E56]/30"
-          />
+          <label className="text-xs text-gray-500 font-medium block mb-1">Nivel de riesgo</label>
+          <select
+            value={filtros.nivel_riesgo ?? ''}
+            onChange={(e) => set('nivel_riesgo', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#8B43D4] focus:ring-1 focus:ring-[#8B43D4]/30 bg-white"
+          >
+            <option value="">Todos</option>
+            {NIVELES.map((n) => <option key={n.value} value={n.value}>{n.label}</option>)}
+          </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 font-medium block mb-1">Distrito</label>
-          <input
-            type="text"
-            placeholder="Ej: Belén"
-            value={filtros.distrito ?? ''}
-            onChange={(e) => set('distrito', e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#0F6E56] focus:ring-1 focus:ring-[#0F6E56]/30"
-          />
+          <label className="text-xs text-gray-500 font-medium block mb-1">Tipo de violencia</label>
+          <select
+            value={filtros.tipo_violencia ?? ''}
+            onChange={(e) => set('tipo_violencia', e.target.value)}
+            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-[#8B43D4] focus:ring-1 focus:ring-[#8B43D4]/30 bg-white"
+          >
+            <option value="">Todos</option>
+            {TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
         </div>
       </div>
     </div>

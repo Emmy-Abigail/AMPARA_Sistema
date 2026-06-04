@@ -16,13 +16,16 @@ export interface CasoLocal {
   estado:           string;
   fecha_denuncia:   string;
   fecha_actualizacion: string;
-  denuncia_id:      string | null;  // UUID del servidor (null hasta sincronizar)
+  denuncia_id:      string | null;
   es_anonima:       boolean;
-  foto_url:         string | null;
+  foto_url:         string | null;  // URI local (file://) o URL del servidor
+  descripcion:      string | null;
 }
 
-export async function guardarCasoLocal(caso: Omit<CasoLocal, 'estado' | 'denuncia_id' | 'fecha_actualizacion'>): Promise<void> {
-  const lista = await obtenerCasosLocales();
+export async function guardarCasoLocal(
+  caso: Omit<CasoLocal, 'estado' | 'denuncia_id' | 'fecha_actualizacion'>,
+): Promise<void> {
+  const lista    = await obtenerCasosLocales();
   const filtrada = lista.filter(c => c.local_id !== caso.local_id);
   const nuevo: CasoLocal = {
     ...caso,

@@ -1,43 +1,92 @@
+// dashboard - src - api - endpoints.ts
 import { api } from './client';
-import type { Filtros, KpisData, ReporteMapa, NotiMapa, NetlabMapa, FeedItem, TendenciasData } from '../types';
+import type {
+  ApiResponse,
+  PaginatedData,
+  KpisData,
+  Denuncia,
+  DenunciaMapa,
+  MensajeResponse,
+  Operador,
+  Filtros,
+  EstadoCaso,
+} from '../types';
 
-function toParams(f: Partial<Filtros>) {
+// Construye query params solo con los valores presentes
+function toParams(f: Partial<Filtros>): Record<string, string> {
   const p: Record<string, string> = {};
-  if (f.fecha_desde) p.fecha_desde = f.fecha_desde;
-  if (f.fecha_hasta) p.fecha_hasta = f.fecha_hasta;
-  if (f.departamento) p.departamento = f.departamento;
-  if (f.provincia) p.provincia = f.provincia;
-  if (f.distrito) p.distrito = f.distrito;
+  if (f.fecha_desde)    p.fecha_desde    = f.fecha_desde;
+  if (f.fecha_hasta)    p.fecha_hasta    = f.fecha_hasta;
+  if (f.estado)         p.estado         = f.estado;
+  if (f.nivel_riesgo)   p.nivel_riesgo   = f.nivel_riesgo;
+  if (f.tipo_violencia) p.tipo_violencia = f.tipo_violencia;
   return p;
 }
 
 export const dashboardApi = {
+  // ─── Auth ──────────────────────────────────────────────────────────────────
   login: (email: string, password: string) =>
     api.post('/auth/login', { email, password }).then((r) => r.data),
 
+  // ─── KPIs ──────────────────────────────────────────────────────────────────
+  // GET /dashboard/stats → ApiResponse<KpisData>
   kpis: (f: Partial<Filtros>) =>
-    api.get<KpisData>('/dashboard/kpis', { params: toParams(f) }).then((r) => r.data),
+    api
+      .get<ApiResponse<KpisData>>('/dashboard/stats', { params: toParams(f) })
+      .then((r) => r.data.data),
 
-  mapaReportes: (f: Partial<Filtros>) =>
-    api.get<ReporteMapa[]>('/dashboard/mapa/reportes', { params: toParams(f) }).then((r) => r.data),
+  // ─── Mapa ──────────────────────────────────────────────────────────────────
+  // GET /dashboard/mapa → ApiResponse<DenunciaMapa[]>
+  mapaDenuncias: () =>
+    api
+      .get<ApiResponse<DenunciaMapa[]>>('/dashboard/mapa')
+      .then((r) => r.data.data),
 
-  mapaNoti: (f: Partial<Filtros>) =>
-    api.get<NotiMapa[]>('/dashboard/mapa/noti', { params: toParams(f) }).then((r) => r.data),
+  // ─── Feed / listado de denuncias ──────────────────────────────────────────
+  // GET /dashboard/denuncias → ApiResponse<PaginatedData<Denuncia>>
+  denuncias: (
+    f: Partial<Filtros>,
+    pagina = 1,
+    porPagina = 30,
+  ) =>
+    api
+      .get<ApiResponse<PaginatedData<Denuncia>>>('/dashboard/denuncias', {
+        params: { ...toParams(f), pagina, porPagina },
+      })
+      .then((r) => r.data.data),
 
-  mapaNetlab: (f: Partial<Filtros>) =>
-    api.get<NetlabMapa[]>('/dashboard/mapa/netlab', { params: toParams(f) }).then((r) => r.data),
+  // ─── Acciones sobre una denuncia ──────────────────────────────────────────
+  // PATCH /dashboard/denuncias/:id/estado
+  cambiarEstado: (id: string, estado: EstadoCaso, motivo_cierre?: string) =>
+    api
+      .patch<ApiResponse<Denuncia>>(`/dashboard/denuncias/${id}/estado`, {
+        estado,
+        motivo_cierre,
+      })
+      .then((r) => r.data.data),
 
-  feed: (f: Partial<Filtros>, limit = 30, estado?: string) =>
-    api.get<FeedItem[]>('/dashboard/feed', {
-      params: { ...toParams(f), limit, ...(estado ? { estado } : {}) },
-    }).then((r) => r.data),
+  // PATCH /dashboard/denuncias/:id/asignar
+  asignarOperador: (id: string, operador_id: string) =>
+    api
+      .patch<ApiResponse<Denuncia>>(`/dashboard/denuncias/${id}/asignar`, {
+        operador_id,
+      })
+      .then((r) => r.data.data),
 
-  tendencias: (f: Partial<Filtros>) =>
-    api.get<TendenciasData>('/dashboard/tendencias', { params: toParams(f) }).then((r) => r.data),
+  // ─── Operadores ───────────────────────────────────────────────────────────
+  // GET /dashboard/operadores
+  operadores: () =>
+    api
+      .get<ApiResponse<Operador[]>>('/dashboard/operadores')
+      .then((r) => r.data.data),
 
-  ubicaciones: () =>
-    api.get<{ departamentos: string[] }>('/dashboard/ubicaciones').then((r) => r.data),
-
-  actualizarEstado: (id: string, estado: string) =>
-    api.patch(`/dashboard/reportes/${id}/estado`, { estado }).then((r) => r.data),
+  // ─── Mensajes ─────────────────────────────────────────────────────────────
+  // POST /dashboard/denuncias/:id/mensajes
+  sendMensaje: (denunciaId: string, contenido: string, destruirAlLeer: boolean) =>
+    api
+      .post<ApiResponse<MensajeResponse>>(`/dashboard/denuncias/${denunciaId}/mensajes`, {
+        contenido,
+        destruir_al_leer: destruirAlLeer,
+      })
+      .then((r) => r.data.data),
 };

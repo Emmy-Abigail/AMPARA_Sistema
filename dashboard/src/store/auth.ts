@@ -13,20 +13,20 @@ interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  token: localStorage.getItem('sivapre_token'),
+export const useAuthStore = create<AuthState>()((set) => ({
+  token: localStorage.getItem('ampara_token'),
   user: (() => {
-    try { return JSON.parse(localStorage.getItem('sivapre_user') || 'null'); }
+    try { return JSON.parse(localStorage.getItem('ampara_user') || 'null'); }
     catch { return null; }
   })(),
   login: (token, user) => {
-    localStorage.setItem('sivapre_token', token);
-    localStorage.setItem('sivapre_user', JSON.stringify(user));
+    localStorage.setItem('ampara_token', token);
+    localStorage.setItem('ampara_user', JSON.stringify(user));
     set({ token, user });
   },
   logout: () => {
-    localStorage.removeItem('sivapre_token');
-    localStorage.removeItem('sivapre_user');
+    localStorage.removeItem('ampara_token');
+    localStorage.removeItem('ampara_user');
     set({ token: null, user: null });
   },
 }));

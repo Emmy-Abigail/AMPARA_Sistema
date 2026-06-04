@@ -82,6 +82,7 @@ export interface Denuncia {
   longitud?: number;
   preferencia_contacto: PreferenciaContacto;
   horario_contacto?: string;
+  descripcion?: string;
   es_anonima: boolean;
   estado: EstadoCaso;
   fecha_denuncia: string;
@@ -98,6 +99,7 @@ export interface CrearDenunciaPayload {
   longitud?: number;
   preferencia_contacto: PreferenciaContacto;
   horario_contacto?: string;
+  descripcion?: string;
   device_id?: string;
   local_id?: string;
 }

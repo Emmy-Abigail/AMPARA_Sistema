@@ -17,7 +17,7 @@ export interface PendingDenuncia {
   token_anonimo: string;
   tipo_violencia: TipoViolencia;
   relacion_agresor: RelacionAgresor;
-  hay_heridos: number; // SQLite no tiene bool — 0/1
+  hay_heridos: number;
   foto_local_uri: string | null;
   foto_url: string | null;
   audio_local_uri: string | null;
@@ -26,6 +26,7 @@ export interface PendingDenuncia {
   longitud: number | null;
   preferencia_contacto: PreferenciaContacto;
   horario_contacto: string | null;
+  descripcion: string | null;
   estado: PendingDenunciaStatus;
   created_at: string;
   updated_at: string;
@@ -59,6 +60,7 @@ export function initDb(): void {
       longitud            REAL,
       preferencia_contacto TEXT   NOT NULL DEFAULT 'ninguno',
       horario_contacto    TEXT,
+      descripcion         TEXT,
       estado              TEXT    NOT NULL DEFAULT 'pendiente',
       created_at          TEXT    NOT NULL,
       updated_at          TEXT    NOT NULL,
@@ -69,7 +71,14 @@ export function initDb(): void {
     );
   `);
 
-  // Resetear registros atascados en 'enviando' (crash durante sync anterior).
+  // Migración: agregar columna descripcion a instalaciones previas
+  try {
+    getDb().execSync(`ALTER TABLE pending_denuncias ADD COLUMN descripcion TEXT`);
+  } catch {
+    // Columna ya existe — ignorar
+  }
+
+  // Resetear registros atascados en 'enviando' (crash durante sync anterior)
   getDb().runSync(
     `UPDATE pending_denuncias SET estado = 'pendiente', updated_at = ? WHERE estado = 'enviando'`,
     [new Date().toISOString()],
@@ -91,35 +100,37 @@ export async function insertPendingDenuncia(d: {
   longitud?: number | null;
   preferencia_contacto: PreferenciaContacto;
   horario_contacto?: string | null;
+  descripcion?: string | null;
 }): Promise<void> {
   const now = new Date().toISOString();
   const params: Record<string, string | number> = {
-    $local_id:            d.local_id,
-    $device_id:           d.device_id,
-    $token_anonimo:       d.token_anonimo,
-    $tipo_violencia:      d.tipo_violencia,
-    $relacion_agresor:    d.relacion_agresor,
-    $hay_heridos:         d.hay_heridos ? 1 : 0,
+    $local_id:             d.local_id,
+    $device_id:            d.device_id,
+    $token_anonimo:        d.token_anonimo,
+    $tipo_violencia:       d.tipo_violencia,
+    $relacion_agresor:     d.relacion_agresor,
+    $hay_heridos:          d.hay_heridos ? 1 : 0,
     $preferencia_contacto: d.preferencia_contacto,
-    $created_at:          now,
-    $updated_at:          now,
+    $created_at:           now,
+    $updated_at:           now,
   };
-  if (d.foto_local_uri)    params.$foto_local_uri   = d.foto_local_uri;
-  if (d.audio_local_uri)   params.$audio_local_uri  = d.audio_local_uri;
-  if (d.latitud != null)   params.$latitud           = d.latitud;
-  if (d.longitud != null)  params.$longitud          = d.longitud;
-  if (d.horario_contacto)  params.$horario_contacto = d.horario_contacto;
+  if (d.foto_local_uri)   params.$foto_local_uri   = d.foto_local_uri;
+  if (d.audio_local_uri)  params.$audio_local_uri  = d.audio_local_uri;
+  if (d.latitud != null)  params.$latitud           = d.latitud;
+  if (d.longitud != null) params.$longitud          = d.longitud;
+  if (d.horario_contacto) params.$horario_contacto = d.horario_contacto;
+  if (d.descripcion)      params.$descripcion      = d.descripcion;
 
   await getDb().runAsync(
     `INSERT OR IGNORE INTO pending_denuncias
        (local_id, device_id, token_anonimo, tipo_violencia, relacion_agresor,
         hay_heridos, foto_local_uri, foto_url, audio_local_uri, audio_url,
-        latitud, longitud, preferencia_contacto, horario_contacto,
+        latitud, longitud, preferencia_contacto, horario_contacto, descripcion,
         estado, created_at, updated_at)
      VALUES
        ($local_id, $device_id, $token_anonimo, $tipo_violencia, $relacion_agresor,
         $hay_heridos, $foto_local_uri, NULL, $audio_local_uri, NULL,
-        $latitud, $longitud, $preferencia_contacto, $horario_contacto,
+        $latitud, $longitud, $preferencia_contacto, $horario_contacto, $descripcion,
         'pendiente', $created_at, $updated_at)`,
     params,
   );

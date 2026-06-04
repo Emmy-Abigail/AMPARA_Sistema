@@ -63,6 +63,8 @@ async def get_current_user(
             settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
         )
+        if payload.get("type") != "access":
+            raise credentials_exception
         email: str | None = payload.get("sub")
         if email is None:
             raise credentials_exception

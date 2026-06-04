@@ -10,8 +10,6 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  Dimensions,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +30,7 @@ import type { MainTabParamList, TipoViolencia, RelacionAgresor, NivelRiesgo, Pre
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Report'>;
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const TOTAL_STEPS  = 5;
+const TOTAL_STEPS = 5;
 
 const TIPOS_VIOLENCIA: { value: TipoViolencia; icono: string }[] = [
   { value: 'Física',       icono: 'body-outline'          },
@@ -60,13 +57,12 @@ function calcularNivelRiesgo(relacion: RelacionAgresor, heridos: boolean): Nivel
 }
 
 function generarToken(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let token = 'AMP-';
-  for (let i = 0; i < 8; i++) {
-    if (i === 4) token += '-';
-    token += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return token;
+  const chars  = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const random = (n: number) =>
+    Array.from(Crypto.getRandomBytes(n))
+      .map((b) => chars[b % chars.length])
+      .join('');
+  return `AMP-${random(4)}-${random(4)}`;
 }
 
 async function getOrCreateDeviceId(): Promise<string> {
@@ -322,7 +318,8 @@ export default function ReportScreen({ navigation }: Props) {
         hay_heridos:      params.heridos,
         fecha_denuncia:   ahora,
         es_anonima:       true,
-        foto_url:         null,
+        foto_url:         fotoUri,
+        descripcion:      null,
       });
 
       // Sync fire-and-forget: si hay red, la denuncia llega en segundos

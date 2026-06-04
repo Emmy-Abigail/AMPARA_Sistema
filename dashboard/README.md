@@ -1,73 +1,39 @@
-# React + TypeScript + Vite
+# Ampara — Dashboard Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Panel de gestión para operadores y administradores del sistema Ampara.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **React 18** + **TypeScript**
+- **Vite** — bundler y servidor de desarrollo
+- **Leaflet** — mapa interactivo de denuncias
+- **Redux Toolkit** — estado global
+- **React Router v6** — navegación
 
-## React Compiler
+## Desarrollo local
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev   # http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Requiere que el backend esté corriendo en `http://localhost:8000`. Ver el [README raíz](../README.md) para levantar el entorno completo con Docker.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts disponibles
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo con HMR |
+| `npm run build` | Build de producción en `dist/` |
+| `npm run preview` | Vista previa del build de producción |
+| `npm run lint` | Revisión de código con ESLint |
+
+## Variables de entorno
+
+Crear un archivo `.env.local` en esta carpeta:
+
+```env
+VITE_API_URL=http://localhost:8000
 ```
+
+En producción, nginx sirve el `dist/` y el proxy `/api/*` apunta al backend.

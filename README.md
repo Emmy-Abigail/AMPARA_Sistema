@@ -1,10 +1,8 @@
-# SIVAPRE
+# Ampara
 
-**Sistema de Vigilancia y Prevención de Enfermedades**
+**Plataforma de denuncias de violencia de género**
 
-Plataforma epidemiológica para reportar y gestionar criaderos de mosquitos (*Aedes aegypti*) en el Perú. Los ciudadanos reportan criaderos con foto y GPS desde la app Android. Los inspectores de salud los gestionan desde un dashboard web.
-
-> **Estado actual del piloto**: el sistema opera únicamente con reportes ciudadanos de la app móvil. Las tablas de datos NOTI (casos sospechosos) y NETLAB (confirmados por laboratorio) existen en la base de datos pero la integración con esos sistemas externos del MINSA no está implementada — los datos tendrían que cargarse manualmente.
+Ampara permite a cualquier persona reportar situaciones de violencia de género desde su celular — de forma anónima o con cuenta — y a operadores de salud o servicios sociales gestionar esos casos desde un panel web.
 
 ---
 
@@ -12,10 +10,20 @@ Plataforma epidemiológica para reportar y gestionar criaderos de mosquitos (*Ae
 
 | Componente | Tecnología | Descripción |
 |---|---|---|
-| **App móvil** | React Native + Expo SDK 54 | Android — ciudadanos reportan criaderos offline-first |
-| **Backend (API)** | FastAPI + PostgreSQL + PostGIS | Servidor central, almacenamiento, autenticación |
-| **Dashboard web** | React + Vite + Leaflet | Inspectores — mapa, KPIs, gestión de reportes |
+| **App móvil** | React Native + Expo SDK 54 | Android — ciudadanos reportan VG con foto, audio y GPS, offline-first |
+| **Backend (API)** | FastAPI + PostgreSQL + PostGIS + Redis | Servidor central, autenticación JWT, almacenamiento de evidencia, rate limiting |
+| **Dashboard web** | React + Vite + Leaflet | Operadores y admin — mapa de casos, KPIs, gestión de denuncias |
 | **Infraestructura** | Docker Compose + nginx | Un VPS, todo en puerto 80 |
+
+---
+
+## Roles
+
+| Rol | Herramienta | Qué puede hacer |
+|---|---|---|
+| **Usuario (ciudadano)** | App móvil | Registrar denuncia (anónima o con cuenta), subir evidencia, seguir su caso |
+| **Operador** | Dashboard web | Ver y gestionar los casos asignados, actualizar estado, enviar mensajes |
+| **Admin** | Dashboard web | Todo lo del operador + crear y gestionar cuentas de personal |
 
 ---
 
@@ -34,7 +42,7 @@ cd backend
 cp .env.example .env   # completar con tus credenciales
 cd ..
 docker compose up -d
-docker exec sivapre_backend alembic upgrade head
+docker exec ampara_backend alembic upgrade head
 ```
 
 ### 2 — Crear el primer administrador
@@ -44,8 +52,8 @@ curl -X POST http://localhost:8000/api/v1/auth/setup \
   -H "Content-Type: application/json" \
   -d '{
     "admin_secret": "TU_ADMIN_SECRET_KEY",
-    "nombre": "Admin SIVAPRE",
-    "email": "admin@sivapre.gob.pe",
+    "nombre": "Admin",
+    "email": "admin@ampara.pe",
     "password": "contraseña-segura"
   }'
 ```
@@ -71,7 +79,7 @@ npx expo start
 ## Estructura del repositorio
 
 ```
-sivapre/
+ampara/
 ├── backend/           # API FastAPI + modelos + migraciones
 ├── mobile/            # App React Native (Expo SDK 54)
 ├── dashboard/         # Panel web React + Vite

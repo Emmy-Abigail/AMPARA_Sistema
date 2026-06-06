@@ -260,7 +260,6 @@ export default function ReportScreen({ navigation }: Props) {
       mediaTypes: ['images'] as any,
       allowsEditing: false,
       quality: 0.7,
-      saveToPhotos: false, // CRÍTICO: no guardar en el carrete del teléfono
     });
     if (!result.canceled && result.assets[0]) {
       const tempUri = result.assets[0].uri;

@@ -46,14 +46,8 @@ export const ICONOS: IconoOpcion[] = [
   },
 ];
 
-export async function aplicarIcono(icono: IconoOpcion): Promise<boolean> {
-  try {
-    // expo-alternate-app-icon solo funciona en builds nativas (no Expo Go)
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('expo-alternate-app-icon') as { setAlternateAppIcon: (name: string | null) => Promise<void> };
-    await mod.setAlternateAppIcon(icono.alternateKey);
-    return true;
-  } catch {
-    return false;
-  }
+export async function aplicarIcono(_icono: IconoOpcion): Promise<boolean> {
+  // Requiere build nativa con assets configurados en app.json
+  // Se habilitará en una versión futura
+  return false;
 }

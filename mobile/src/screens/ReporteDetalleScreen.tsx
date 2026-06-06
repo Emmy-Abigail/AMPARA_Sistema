@@ -181,7 +181,6 @@ export default function ReporteDetalleScreen({ route, navigation }: Props) {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'] as any,
       quality: 0.7,
-      saveToPhotos: false,
     });
     if (!result.canceled && result.assets[0]) {
       setInfoFotoUri(result.assets[0].uri);

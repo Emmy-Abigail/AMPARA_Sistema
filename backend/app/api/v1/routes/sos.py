@@ -143,20 +143,41 @@ async def mis_alertas_sos(
 
 @router.patch("/{alerta_id}/resolver", status_code=status.HTTP_204_NO_CONTENT)
 async def resolver_sos(
-    alerta_id: uuid.UUID,
+    alerta_id:     uuid.UUID,
+    authorization: Optional[str] = Header(default=None),
+    x_device_id:   Optional[str] = Header(default=None, alias="X-Device-Id"),
     db: AsyncSession = Depends(get_db),
-    usuario: Usuario = Depends(get_current_user),
 ):
+    # Resolver identidad: JWT o device_id (igual que mis-alertas)
+    usuario = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+        try:
+            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            if payload.get("type") == "access":
+                email = payload.get("sub")
+                if email:
+                    r = await db.execute(select(Usuario).where(Usuario.email == email))
+                    usuario = r.scalar_one_or_none()
+        except (JWTError, Exception):
+            pass
+
     result = await db.execute(select(AlertaSos).where(AlertaSos.id == alerta_id))
     alerta = result.scalar_one_or_none()
     if not alerta:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
 
-    es_propia  = alerta.usuario_id == usuario.id
-    es_staff   = usuario.rol in ("operador", "admin")
-    if not es_propia and not es_staff:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    if usuario:
+        es_propia = alerta.usuario_id == usuario.id
+        es_staff  = usuario.rol in ("operador", "admin")
+        if not es_propia and not es_staff:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    elif x_device_id:
+        if alerta.device_id != x_device_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    alerta.estado = "resuelta"
+    alerta.estado = "cancelada"
     await db.flush()
     return None

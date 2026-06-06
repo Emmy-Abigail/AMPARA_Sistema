@@ -26,7 +26,10 @@ export async function activarSosAlerta(params: SosAlertaParams): Promise<SosAler
 }
 
 export async function cancelarSosAlerta(alertaId: string): Promise<void> {
-  await api.patch(`/sos/${alertaId}/resolver`);
+  const deviceId = await storage.getItem(StorageKeys.DEVICE_ID);
+  await api.patch(`/sos/${alertaId}/resolver`, null, {
+    headers: deviceId ? { 'X-Device-Id': deviceId } : {},
+  });
 }
 
 export async function listarMisAlertas(): Promise<SosAlertaResponse[]> {

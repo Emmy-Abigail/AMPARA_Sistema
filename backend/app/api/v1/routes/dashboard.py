@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -107,9 +107,15 @@ async def listar_denuncias(
     fecha_hasta:    Optional[date] = Query(None),
     solo_activas:   bool           = Query(False),
     db:             AsyncSession   = Depends(get_db),
-    _:              Usuario        = Depends(_require_operador),
+    current:        Usuario        = Depends(_require_operador),
 ):
     q = select(Denuncia)
+
+    # Operadores ven solo sus casos + los sin asignar; admins ven todo
+    if current.rol == "operador":
+        q = q.where(
+            or_(Denuncia.operador_id == current.id, Denuncia.estado == "nueva")
+        )
 
     if solo_activas:   q = q.where(Denuncia.estado != "cerrada")
     if estado:         q = q.where(Denuncia.estado == estado)

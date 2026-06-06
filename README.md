@@ -2,7 +2,7 @@
 
 **Plataforma de denuncias de violencia de género**
 
-Ampara permite a cualquier persona reportar situaciones de violencia de género desde su celular — de forma anónima o con cuenta — y a operadores de salud o servicios sociales gestionar esos casos desde un panel web.
+Ampara permite a cualquier persona reportar situaciones de violencia de género desde su celular — de forma anónima o con cuenta — y a operadores gestionar esos casos desde un panel web. Incluye alerta SOS con notificación por SMS al círculo de confianza.
 
 ---
 
@@ -10,9 +10,9 @@ Ampara permite a cualquier persona reportar situaciones de violencia de género 
 
 | Componente | Tecnología | Descripción |
 |---|---|---|
-| **App móvil** | React Native + Expo SDK 54 | Android — ciudadanos reportan VG con foto, audio y GPS, offline-first |
-| **Backend (API)** | FastAPI + PostgreSQL + PostGIS + Redis | Servidor central, autenticación JWT, almacenamiento de evidencia, rate limiting |
-| **Dashboard web** | React + Vite + Leaflet | Operadores y admin — mapa de casos, KPIs, gestión de denuncias |
+| **App móvil** | React Native + Expo SDK 54 | Android — offline-first, modo anónimo, alerta SOS, mensajería con operador |
+| **Backend (API)** | FastAPI + PostgreSQL + PostGIS + Redis | API REST, JWT + autenticación opcional, almacenamiento de evidencia, rate limiting |
+| **Dashboard web** | React + Vite | Operadores y admin — expedientes, mapa, mensajería, alertas SOS en tiempo real |
 | **Infraestructura** | Docker Compose + nginx | Un VPS, todo en puerto 80 |
 
 ---
@@ -21,8 +21,8 @@ Ampara permite a cualquier persona reportar situaciones de violencia de género 
 
 | Rol | Herramienta | Qué puede hacer |
 |---|---|---|
-| **Usuario (ciudadano)** | App móvil | Registrar denuncia (anónima o con cuenta), subir evidencia, seguir su caso |
-| **Operador** | Dashboard web | Ver y gestionar los casos asignados, actualizar estado, enviar mensajes |
+| **Usuaria (ciudadana)** | App móvil | Registrar denuncia (anónima o con cuenta), subir evidencia, chatear con operador, activar SOS |
+| **Operador** | Dashboard web | Ver y gestionar sus casos asignados + sin asignar, enviar mensajes, atender SOS |
 | **Admin** | Dashboard web | Todo lo del operador + crear y gestionar cuentas de personal |
 
 ---
@@ -80,7 +80,7 @@ npx expo start
 
 ```
 ampara/
-├── backend/           # API FastAPI + modelos + migraciones
+├── backend/           # API FastAPI + modelos + migraciones Alembic
 ├── mobile/            # App React Native (Expo SDK 54)
 ├── dashboard/         # Panel web React + Vite
 ├── docs/              # Documentación completa
@@ -91,7 +91,7 @@ ampara/
 
 ## Documentación
 
-Ver la carpeta [`docs/`](./docs/) para la documentación completa del sistema.
+Ver la carpeta [`docs/`](./docs/) para la documentación técnica completa.
 
 ---
 
@@ -101,3 +101,4 @@ Ver la carpeta [`docs/`](./docs/) para la documentación completa del sistema.
 |---|---|
 | Dashboard | http://161.132.53.226 |
 | API | http://161.132.53.226/api/v1 |
+| APK (Android) | expo.dev → proyecto ampara → último build preview |

@@ -1,4 +1,4 @@
-# Despliegue y Mantenimiento — SIVAPRE
+# Despliegue y Mantenimiento — Ampara
 
 Cómo actualizar el sistema en el VPS, construir nuevas versiones del APK, hacer backups y diagnosticar problemas.
 
@@ -25,8 +25,8 @@ Cómo actualizar el sistema en el VPS, construir nuevas versiones del APK, hacer
 |---|---|---|
 | Dashboard | `http://161.132.53.226` | Activo |
 | API | `http://161.132.53.226/api/v1` | Activo |
-| Fotos | `http://161.132.53.226/uploads/*` | Activo |
-| APK (preview) | Descargable desde expo.dev | Activo |
+| Fotos y audio | `http://161.132.53.226/uploads/*` | Activo |
+| APK (preview) | expo.dev → proyecto ampara | Activo |
 
 ### Cómo está organizado
 
@@ -34,63 +34,57 @@ Todo corre en un solo VPS con Docker Compose:
 
 ```
 VPS: 161.132.53.226
-├── nginx (puerto 80)         ← único punto de entrada
-├── FastAPI (puerto 8000)     ← interno, solo accesible desde Docker
-├── PostgreSQL (puerto 5432)  ← interno
-└── Redis (puerto 6379)       ← interno
+├── ampara_dashboard (nginx, puerto 80)   ← único punto de entrada
+├── ampara_backend  (FastAPI, puerto 8000) ← interno
+├── ampara_db       (PostgreSQL, puerto 5432) ← interno
+└── ampara_redis    (Redis, puerto 6379)  ← interno
 ```
 
-El repositorio está en `~/sivapre` del VPS. Los datos persisten en volúmenes Docker que **sobreviven** a reinicios y a `docker compose down`.
+El repositorio está en `~/ampara` del VPS. Los datos persisten en volúmenes Docker que **sobreviven** a reinicios y a `docker compose down`.
 
 ---
 
 ## 2. Conectarse al VPS
 
 ```bash
-ssh usuario@161.132.53.226
+ssh abigail@10.234.162.153   # red local (Pi / VPS local)
+# o
+ssh usuario@161.132.53.226   # VPS público
 ```
 
-Una vez conectado, ir al directorio del proyecto:
+Una vez conectado:
 
 ```bash
-cd ~/sivapre
+cd ~/ampara
 ```
 
-La sesión SSH puede cerrarse sin problema — los contenedores Docker siguen corriendo en segundo plano. Los datos no se pierden al cerrar la laptop o cortar la conexión.
+Los contenedores siguen corriendo aunque se cierre la sesión SSH.
 
 ---
 
 ## 3. Actualizar el backend
 
-### Caso más común — cambio de código Python
+### Cambio de código Python (lo más común)
 
 ```bash
-# 1. Bajar los cambios del repositorio
 git pull origin main
-
-# 2. Reconstruir el contenedor del backend
 docker compose up -d --build backend
-
-# 3. Verificar que está corriendo bien
-docker logs sivapre_backend --tail 50
+docker logs ampara_backend --tail 50
 ```
 
-### Si solo cambió el .env (variables de entorno)
+### Solo cambió `.env`
 
 ```bash
-# Las variables se leen al arrancar — solo hace falta reiniciar
-docker restart sivapre_backend
+docker restart ampara_backend
 ```
 
-### Si hay nuevas migraciones de base de datos
+### Hay nuevas migraciones
 
-Las migraciones se aplican automáticamente al iniciar el contenedor. Para aplicarlas manualmente si algo falla:
+Las migraciones se aplican automáticamente al arrancar. Para aplicarlas manualmente:
 
 ```bash
-docker exec sivapre_backend alembic upgrade head
-
-# Ver qué migración está aplicada actualmente
-docker exec sivapre_backend alembic current
+docker exec ampara_backend alembic upgrade head
+docker exec ampara_backend alembic current   # ver migración activa
 ```
 
 ### Verificar que el backend responde
@@ -100,39 +94,34 @@ curl http://161.132.53.226/api/v1/health
 # Debe devolver: {"status": "ok", "db": "ok"}
 ```
 
-Si el health check devuelve 503, la base de datos no está respondiendo:
-
-```bash
-docker ps   # verificar que sivapre_db está en estado "healthy"
-docker logs sivapre_db --tail 30
-```
-
 ---
 
 ## 4. Actualizar el dashboard
 
-El dashboard es un sitio estático. Para actualizar hay que hacer el build y copiar los archivos al contenedor de nginx.
+El dashboard es un sitio estático. Para actualizar, construir localmente y copiar los archivos.
+
+**Opción A — desde la máquina de desarrollo:**
 
 ```bash
-# 1. Bajar los cambios
-git pull origin main
-
-# 2. Instalar dependencias si cambiaron (si no, se puede saltar)
-cd dashboard && npm install && cd ..
-
-# 3. Construir
+# 1. Construir
 cd dashboard && npm run build && cd ..
 
-# 4. Reiniciar el contenedor de nginx
-#    (usa el volumen montado en docker-compose: ./dashboard/dist → /usr/share/nginx/html)
-docker restart sivapre_dashboard
+# 2. Copiar al servidor
+scp -r dashboard/dist/* abigail@10.234.162.153:/home/abigail/ampara/dashboard/dist/
 
-# 5. Verificar
-curl -s http://161.132.53.226 | head -5
-# Debe devolver las primeras líneas del index.html
+# 3. Reiniciar nginx (lee del volumen montado)
+ssh abigail@10.234.162.153 "docker restart ampara_dashboard"
 ```
 
-**Por qué `docker restart` en vez de reconstruir la imagen**: el `docker-compose.yml` monta `./dashboard/dist` como un volumen de solo lectura en nginx. Al hacer el build local y reiniciar, nginx ya ve los nuevos archivos. No hace falta reconstruir la imagen Docker del dashboard.
+**Opción B — desde el VPS:**
+
+```bash
+git pull origin main
+cd dashboard && npm install && npm run build && cd ..
+docker restart ampara_dashboard
+```
+
+**Por qué `docker restart` y no reconstruir la imagen**: el `docker-compose.yml` monta `./dashboard/dist` como volumen de solo lectura en nginx. Al hacer el build y reiniciar, nginx ya ve los nuevos archivos.
 
 ---
 
@@ -144,19 +133,16 @@ El APK se construye en los servidores de Expo (EAS Build), no en el VPS.
 
 ```bash
 npm install -g eas-cli
-eas login   # con la cuenta de expo.dev
+eas login   # cuenta emmy_lopez en expo.dev
 ```
 
 ### Construir el APK de prueba (preview)
 
 ```bash
 cd mobile
-
-# Construir — tarda ~10-15 minutos en los servidores de EAS
 eas build --platform android --profile preview
-
-# Al terminar muestra un enlace de descarga y un QR
-# También se puede ver en: expo.dev/accounts/emmy_lopez/projects/sivapre/builds
+# Tarda ~10-15 min. Al terminar muestra el enlace de descarga.
+# También en: expo.dev/accounts/emmy_lopez/projects/ampara/builds
 ```
 
 ### Ver los builds anteriores
@@ -165,20 +151,13 @@ eas build --platform android --profile preview
 eas build:list --platform android --limit 5
 ```
 
-### Qué incluye cada perfil
+### Cuándo reconstruir
 
-| Perfil | API URL | Tipo | Uso |
-|---|---|---|---|
-| `preview` | `http://161.132.53.226/api/v1` | APK | Pruebas internas, distribución a inspectores |
-| `production` | `https://api.sivapre.gob/api/v1` | AAB | Google Play Store (futuro) |
-
-### Cuándo reconstruir el APK
-
-- Cuando cambia la URL del backend (`EXPO_PUBLIC_API_URL`)
-- Cuando se instala un nuevo paquete con módulo nativo
+- Cuando cambia `EXPO_PUBLIC_API_URL`
+- Cuando se instala un nuevo paquete nativo
 - Cuando cambia `app.json` (íconos, permisos, plugins)
 
-Para cambios solo en código TypeScript, se puede publicar una actualización sin rebuild:
+Para cambios solo en código TypeScript/TSX, se puede usar EAS Update (sin rebuild):
 
 ```bash
 eas update --branch preview --message "descripción del cambio"
@@ -188,7 +167,7 @@ eas update --branch preview --message "descripción del cambio"
 
 ## 6. Crear el primer administrador
 
-Solo se puede hacer una vez — el endpoint deja de funcionar después de que existe al menos un administrador.
+Solo funciona una vez — el endpoint se desactiva cuando ya existe al menos un admin.
 
 ```bash
 curl -X POST http://161.132.53.226/api/v1/auth/setup \
@@ -196,14 +175,12 @@ curl -X POST http://161.132.53.226/api/v1/auth/setup \
   -d '{
     "admin_secret": "valor-de-ADMIN_SECRET_KEY-en-.env",
     "nombre": "Administrador",
-    "email": "admin@sivapre.gob.pe",
+    "email": "admin@ampara.pe",
     "password": "contraseña-segura-minimo-8-chars"
   }'
 ```
 
-La clave `admin_secret` debe coincidir con `ADMIN_SECRET_KEY` en `backend/.env`.
-
-Una vez creado el primer admin, los inspectores y demás admins se crean desde el dashboard en **Gestión de Personal**.
+Una vez creado, los operadores y demás admins se crean desde el dashboard en **Gestión de Personal** (sidebar → Personal).
 
 ---
 
@@ -212,41 +189,33 @@ Una vez creado el primer admin, los inspectores y demás admins se crean desde e
 ### Backup manual
 
 ```bash
-# Crear backup con timestamp
-docker exec sivapre_db pg_dump -U sivapre sivapre_db \
-  > ~/backups/sivapre_$(date +%Y%m%d_%H%M).sql
-
-echo "Backup creado: ~/backups/sivapre_$(date +%Y%m%d_%H%M).sql"
+mkdir -p ~/backups
+docker exec ampara_db pg_dump -U ampara ampara_db \
+  > ~/backups/ampara_$(date +%Y%m%d_%H%M).sql
 ```
 
 ### Backup automático con crontab
 
 ```bash
-# Editar el crontab del servidor
 crontab -e
-
-# Agregar esta línea para hacer backup todos los días a las 2:00 AM:
-0 2 * * * docker exec sivapre_db pg_dump -U sivapre sivapre_db > /home/usuario/backups/sivapre_$(date +\%Y\%m\%d).sql
+# Agregar — backup diario a las 2:00 AM:
+0 2 * * * docker exec ampara_db pg_dump -U ampara ampara_db > /home/abigail/backups/ampara_$(date +\%Y\%m\%d).sql
 ```
 
-Recomendación: copiar los backups a un servicio externo (Dropbox, Google Drive, S3) para que no estén en el mismo disco que los datos.
+Recomendación: copiar los backups a un servicio externo (Google Drive, S3) para que no estén en el mismo disco que los datos.
 
 ### Restaurar desde backup
 
 ```bash
-# ⚠️ Esto reemplaza toda la base de datos actual
-cat backup_20260513.sql \
-  | docker exec -i sivapre_db psql -U sivapre -d sivapre_db
+# ⚠️ Reemplaza toda la base de datos actual
+cat backup_20260606.sql | docker exec -i ampara_db psql -U ampara -d ampara_db
 ```
 
-### Backup de fotos
-
-Las fotos están en el volumen Docker `uploads_data`. Para hacer backup:
+### Backup de fotos y audio
 
 ```bash
-# Comprimir y copiar el directorio de uploads
-docker exec sivapre_backend tar czf /tmp/uploads_backup.tar.gz /app/uploads
-docker cp sivapre_backend:/tmp/uploads_backup.tar.gz ~/backups/
+docker exec ampara_backend tar czf /tmp/uploads_backup.tar.gz /app/uploads
+docker cp ampara_backend:/tmp/uploads_backup.tar.gz ~/backups/
 ```
 
 ---
@@ -255,61 +224,61 @@ docker cp sivapre_backend:/tmp/uploads_backup.tar.gz ~/backups/
 
 ### La app muestra "Network Error"
 
-1. Verificar que el backend está corriendo: `docker ps`
-2. Verificar que nginx responde: `curl http://161.132.53.226/api/v1/health`
-3. Ver logs del backend: `docker logs sivapre_backend --tail 50`
-4. Ver logs de nginx: `docker logs sivapre_dashboard --tail 20`
+```bash
+docker ps                                          # verificar contenedores activos
+curl http://161.132.53.226/api/v1/health           # verificar backend
+docker logs ampara_backend --tail 50               # logs del backend
+docker logs ampara_dashboard --tail 20             # logs de nginx
+```
 
-### El dashboard no carga / muestra página en blanco
+### El dashboard no carga / página en blanco
 
-1. Verificar que el contenedor nginx está corriendo: `docker ps`
-2. Verificar que `dashboard/dist/` existe y tiene archivos: `ls dashboard/dist/`
-3. Si `dist/` está vacío: reconstruir con `cd dashboard && npm run build`
-4. Reiniciar nginx: `docker restart sivapre_dashboard`
+```bash
+docker ps                                          # verificar nginx
+ls dashboard/dist/                                 # verificar que dist/ tiene archivos
+cd dashboard && npm run build && cd ..             # si dist/ está vacío
+docker restart ampara_dashboard
+```
 
 ### La base de datos no responde
 
 ```bash
-# Ver estado del contenedor
-docker ps | grep sivapre_db
-
-# Ver logs de PostgreSQL
-docker logs sivapre_db --tail 50
-
-# Reiniciar (los datos persisten en el volumen)
-docker restart sivapre_db
-
-# Verificar que el health check pasa
-docker inspect sivapre_db | grep -A 5 '"Health"'
+docker ps | grep ampara_db
+docker logs ampara_db --tail 50
+docker restart ampara_db
+docker inspect ampara_db | grep -A 5 '"Health"'
 ```
 
-### El backend no aplica las migraciones
+### Las migraciones no se aplican
 
 ```bash
-# Ver qué migraciones están pendientes
-docker exec sivapre_backend alembic upgrade head --sql | head -30
-
-# Aplicar manualmente
-docker exec sivapre_backend alembic upgrade head
-
-# Ver el historial
-docker exec sivapre_backend alembic history
+docker exec ampara_backend alembic upgrade head
+docker exec ampara_backend alembic history
+docker exec ampara_backend alembic current
 ```
 
 ### Redis no responde (rate limiting desactivado)
 
-Si Redis cae, el backend sigue funcionando pero sin rate limiting. Ver los logs:
+Si Redis cae, el backend sigue funcionando pero sin rate limiting (falla en modo abierto):
 
 ```bash
-docker logs sivapre_redis --tail 20
-docker restart sivapre_redis
+docker logs ampara_redis --tail 20
+docker restart ampara_redis
 ```
 
-### Ver todos los logs juntos
+### Ver todos los logs a la vez
 
 ```bash
 docker compose logs -f
-# Ctrl+C para salir
+```
+
+### El SOS no envía SMS
+
+```bash
+# Verificar variables de entorno de SMS en .env
+docker exec ampara_backend env | grep SMS
+# Verificar logs del backend al activar SOS
+docker logs ampara_backend --tail 30
 ```
 
 ---
@@ -320,34 +289,32 @@ docker compose logs -f
 # Estado de todos los contenedores
 docker ps
 
-# Estado incluyendo contenedores parados
-docker ps -a
+# Logs en tiempo real
+docker logs ampara_backend -f
+docker logs ampara_db -f
+docker logs ampara_dashboard -f
+docker logs ampara_redis -f
 
-# Logs de un contenedor (en tiempo real)
-docker logs sivapre_backend -f
-docker logs sivapre_db -f
-docker logs sivapre_dashboard -f
+# Terminal de un contenedor
+docker exec -it ampara_backend bash
+docker exec -it ampara_db psql -U ampara -d ampara_db
 
-# Acceder a la terminal de un contenedor
-docker exec -it sivapre_backend bash
-docker exec -it sivapre_db psql -U sivapre -d sivapre_db
+# Reiniciar uno
+docker restart ampara_backend
 
-# Reiniciar un contenedor
-docker restart sivapre_backend
-
-# Reiniciar todos los contenedores
+# Reiniciar todos
 docker compose restart
 
-# Detener todo (los datos persisten)
+# Detener todo (datos persisten)
 docker compose down
 
 # Levantar todo
 docker compose up -d
 
-# Reconstruir un contenedor específico
+# Reconstruir un servicio
 docker compose up -d --build backend
 
-# Ver cuánto espacio usan los volúmenes y contenedores
+# Espacio usado
 docker system df -v
 ```
 
@@ -360,7 +327,7 @@ docker system df -v
 - [ ] `JWT_SECRET_KEY` es una clave aleatoria única (no la del repo)
 - [ ] `ADMIN_SECRET_KEY` es una clave aleatoria única
 - [ ] `DEBUG=False` en `backend/.env`
-- [ ] `ALLOWED_ORIGINS` tiene la URL correcta (no `*`)
+- [ ] `ALLOWED_ORIGINS` tiene la URL correcta
 - [ ] `POSTGRES_PASSWORD` es una contraseña segura
 
 ### Funcionalidad
@@ -368,13 +335,16 @@ docker system df -v
 - [ ] `curl http://161.132.53.226/api/v1/health` devuelve `{"status": "ok", "db": "ok"}`
 - [ ] El dashboard carga en `http://161.132.53.226`
 - [ ] El login funciona en el dashboard
-- [ ] El login funciona en el APK
-- [ ] Se puede enviar un reporte desde el APK (con foto y GPS)
-- [ ] El reporte aparece en el dashboard
-- [ ] Cambiar el estado de un reporte desde el dashboard funciona
+- [ ] El login funciona en la app
+- [ ] Se puede enviar una denuncia desde la app (anónima y con cuenta)
+- [ ] La denuncia aparece en el dashboard
+- [ ] El operador puede cambiar el estado y enviar un mensaje
+- [ ] La usuaria ve el mensaje en la app
+- [ ] El SOS activa y cierra correctamente
 
-### Datos y backups
+### Datos
 
 - [ ] Backup automático configurado en crontab
 - [ ] Hay al menos un admin creado con `POST /auth/setup`
-- [ ] Los inspectores tienen sus cuentas creadas desde el dashboard
+- [ ] Los operadores tienen sus cuentas creadas desde el dashboard
+- [ ] Se ha probado el flujo anónimo completo (denuncia → seguimiento con código de acceso)

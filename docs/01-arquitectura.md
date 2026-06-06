@@ -1,23 +1,6 @@
-# Arquitectura General — SIVAPRE
+# Arquitectura General — Ampara
 
-Sistema de Vigilancia y Prevención de Enfermedades. Permite a ciudadanos reportar criaderos de mosquitos desde el celular y a inspectores de salud gestionar esos reportes desde un navegador web.
-
----
-
-## Documentación completa
-
-| Documento | Contenido |
-|---|---|
-| [02-backend.md](./02-backend.md) | API, base de datos, autenticación, seguridad, almacenamiento, migraciones |
-| [03-app-movil.md](./03-app-movil.md) | Pantallas, navegación, arquitectura offline, sincronización, build del APK |
-| [04-dashboard.md](./04-dashboard.md) | Componentes, mapa, filtros, gestión de personal |
-| [05-despliegue.md](./05-despliegue.md) | Cómo actualizar el VPS, construir el APK, backups, mantenimiento |
-
----
-
-## Estado actual del piloto
-
-El sistema opera **únicamente con reportes ciudadanos** de la app móvil. Las tablas `casos_noti` y `casos_netlab` existen en la base de datos y el dashboard tiene los componentes para mostrarlas, pero **la integración con los sistemas externos del MINSA no está implementada**. Los datos de NOTI y NETLAB tendrían que cargarse manualmente hasta que se desarrolle esa integración.
+Sistema de denuncias de violencia de género. Permite a cualquier persona reportar una situación de VG desde el celular —con cuenta o de forma completamente anónima— y a operadores de servicios sociales gestionar esos casos desde un navegador web.
 
 ---
 
@@ -25,49 +8,89 @@ El sistema opera **únicamente con reportes ciudadanos** de la app móvil. Las t
 
 | Actor | Herramienta | Qué hace |
 |---|---|---|
-| **Ciudadano** | App móvil (Android) | Reporta criaderos con foto y GPS, ve el estado de sus reportes |
-| **Inspector de salud** | Dashboard web (navegador) | Ve el mapa, gestiona estados de reportes, ve tendencias |
-| **Administrador** | Dashboard web (navegador) | Todo lo del inspector + crea y gestiona cuentas de personal |
+| **Usuaria** | App móvil (Android) | Registra denuncia (anónima o con cuenta), sube evidencia (foto/audio/GPS), sigue el estado de su caso, chatea con el operador, activa alerta SOS |
+| **Operador** | Dashboard web | Ve sus casos asignados y los sin asignar, actualiza estados, envía mensajes a la usuaria, atiende alertas SOS |
+| **Admin** | Dashboard web | Todo lo del operador + crea y gestiona cuentas de personal |
 
 ---
 
 ## Flujo de datos
 
 ```
-CIUDADANO (App móvil)
+USUARIA (App móvil)
     │
-    │  1. Toma foto + captura GPS
-    │  2. Llena el formulario
-    │  3. Reporte guardado en SQLite local (siempre, con o sin señal)
-    │  4. Sync engine envía al servidor cuando hay conexión
-    │  5. Recibe notificación push cuando cambia el estado (*)
+    │  1. Rellena formulario de denuncia (offline-first)
+    │  2. Denuncia guardada en SQLite local (siempre, con o sin señal)
+    │  3. Sync engine envía al servidor cuando hay conexión
+    │  4. Recibe mensajes del operador en la app
+    │  5. Puede activar SOS → SMS a su círculo de confianza
     ▼
 NGINX — puerto 80 (único punto de entrada al VPS)
     │
     ├── /api/*      → FastAPI backend (interno: 8000)
-    ├── /uploads/*  → fotos guardadas en disco
+    ├── /uploads/*  → fotos y audio guardados en disco
     └── /*          → Dashboard web (archivos estáticos)
     │
     ▼
 FASTAPI (Python)
-    ├── Guarda reporte en PostgreSQL
-    ├── Comprime foto a WebP y la guarda en disco
-    └── Al cambiar estado → notificación push al ciudadano (*)
+    ├── Guarda denuncia en PostgreSQL
+    ├── Comprime foto a WebP, guarda audio en disco
+    ├── Al cambiar estado → mensaje de sistema al caso
+    └── SOS activado → envía SMS al círculo de confianza
     │
     ▼
 POSTGRESQL + POSTGIS
-    ├── usuarios, reportes, casos NOTI, casos NETLAB
-    │
+    └── usuarios, denuncias, mensajes_caso, alertas_sos, circulo_confianza
 REDIS
     └── Rate limiting
 
-(*) Push notifications requieren Firebase — pendiente de configurar.
-
-INSPECTOR (Dashboard web)
+OPERADOR (Dashboard web)
     │
-    ├── Ve KPIs, mapa multicapa, feed de reportes, tendencias semanales
-    └── Cambia el estado de los reportes (en revisión → resuelto / rechazado)
+    ├── Ve KPIs, expedientes por pestaña, mapa de casos
+    ├── Cambia el estado del caso, envía mensajes a la usuaria
+    └── Atiende alertas SOS con botón "En atención" / "Resolver"
 ```
+
+---
+
+## Máquinas de estado
+
+### Denuncia
+
+```
+nueva
+  ↓  (operador asigna)
+asignada
+  ↓  (operador inicia seguimiento)
+en_seguimiento
+  ↓  (operador deriva a otra institución)
+derivada          ← opcional
+  ↓
+pendiente_confirmacion   ← espera confirmación antes de cerrar
+  ↓
+cerrada
+```
+
+También puede cerrarse desde cualquier estado. Si el SOS vinculado se cancela/resuelve y la denuncia sigue en `nueva`, se cierra automáticamente.
+
+### Alerta SOS
+
+```
+activa  →  en_atencion  →  resuelta   (operador)
+activa  →                  cancelada  (usuaria desde la app)
+```
+
+---
+
+## Modo anónimo
+
+La app puede usarse sin crear cuenta. En ese modo:
+
+- Se genera un `device_id` único (UUID) al instalar la app y se guarda en `AsyncStorage`.
+- Cada denuncia y alerta SOS lleva ese `device_id`.
+- El backend filtra los datos usando `device_id` → cada dispositivo solo ve sus propios casos.
+- La usuaria recibe un `codigo_acceso` (6 caracteres, sin 0/O/1/I) para consultar su caso manualmente si cambia de dispositivo.
+- El `token_anonimo` (20 chars URL-safe) sirve como identificador interno único en la base de datos.
 
 ---
 
@@ -77,48 +100,62 @@ INSPECTOR (Dashboard web)
 VPS: 161.132.53.226
 │
 └── docker-compose.yml
-    ├── sivapre_dashboard (nginx)   → puerto 80 público
-    ├── sivapre_backend  (FastAPI)  → interno, puerto 8000
-    ├── sivapre_db       (PostgreSQL + PostGIS) → interno, puerto 5432
-    └── sivapre_redis    (Redis)    → interno, puerto 6379
+    ├── ampara_dashboard (nginx)          → puerto 80 público
+    ├── ampara_backend   (FastAPI)        → interno, puerto 8000
+    ├── ampara_db        (PostgreSQL + PostGIS) → interno, puerto 5432
+    └── ampara_redis     (Redis)          → interno, puerto 6379
 ```
 
-Todo el tráfico externo entra por el **puerto 80**. Los demás puertos son internos a la red Docker.
+Todo el tráfico externo entra por el **puerto 80**. Los demás puertos son internos a la red Docker y no están expuestos al exterior.
 
 Los datos persisten en volúmenes Docker:
-- `postgres_data` → base de datos ⚠️ no borrar
-- `uploads_data` → fotos de reportes ⚠️ no borrar
+- `postgres_data` → base de datos ⚠️ nunca borrar
+- `uploads_data` → fotos y audios ⚠️ nunca borrar
 - `redis_data` → contadores de rate limiting (no crítico)
 
 ---
 
 ## Stack tecnológico
 
-| Capa | Tecnologías principales |
+| Capa | Tecnologías |
 |---|---|
-| **App móvil** | React Native, Expo SDK 54, TypeScript, expo-sqlite, expo-location |
-| **Backend** | Python 3.11, FastAPI, SQLAlchemy async, PostgreSQL 16, PostGIS, Redis |
-| **Dashboard** | React 18, Vite, Tailwind CSS 4, Leaflet, Recharts, Zustand |
-| **Infraestructura** | Docker Compose, nginx, EAS Build (Expo) |
+| **App móvil** | React Native, Expo SDK 54, TypeScript, expo-sqlite, expo-location, expo-av |
+| **Backend** | Python 3.11, FastAPI, SQLAlchemy async, Alembic, PostgreSQL 16, PostGIS, Redis |
+| **Dashboard** | React 18, Vite, TypeScript, Tailwind CSS v4, Leaflet, Recharts, React Query, Zustand |
+| **Infraestructura** | Docker Compose, nginx, EAS Build (Expo), Twilio/SMS para SOS |
+
+---
+
+## Seguridad y privacidad por diseño
+
+| Medida | Implementación |
+|---|---|
+| **Modo anónimo real** | Sin cuenta, sin email, solo `device_id` — imposible vincular a persona |
+| **Contraseñas** | Bcrypt — el backend nunca almacena texto plano |
+| **Tokens JWT** | Access (30 min) + Refresh (30 días) con claims `type` para evitar uso cruzado |
+| **Rate limiting** | SlowAPI + Redis — 10/min en login, 5/min en registro |
+| **Fotos** | Validación MIME real + eliminación de EXIF + compresión a WebP con Pillow |
+| **Swagger deshabilitado** | `DEBUG=False` en producción oculta `/docs` y `/openapi.json` |
+| **Ícono de camuflaje** | La app puede disfrazarse de otra aplicación (calculadora, clima, etc.) |
 
 ---
 
 ## Roles y permisos
 
-| Rol | Acceso |
+| Rol | Lo que puede ver/hacer |
 |---|---|
-| `ciudadano` | Solo sus propios reportes (app móvil) |
-| `inspector` | Dashboard completo: lectura y cambio de estados |
-| `admin` | Todo lo del inspector + crear y gestionar cuentas de personal |
+| `usuario` | Solo sus propias denuncias y mensajes |
+| `operador` | Sus casos asignados + todos los casos en estado `nueva` (sin asignar) |
+| `admin` | Todos los casos + crear/gestionar cuentas de personal |
 
 ---
 
-## Limitaciones del piloto
+## Limitaciones actuales
 
 | Limitación | Solución cuando escale |
 |---|---|
 | VPS único — sin alta disponibilidad | Segundo VPS + load balancer |
-| Fotos en disco local | Migrar a MinIO / Cloudflare R2 |
+| Fotos/audio en disco local | Migrar a MinIO / Cloudflare R2 |
 | Sin backups automáticos | `pg_dump` en crontab → almacenamiento externo |
-| HTTP sin HTTPS — notificaciones de escritorio bloqueadas | Dominio + Let's Encrypt |
-| Push notifications no configuradas | Proyecto Firebase + `google-services.json` |
+| HTTP sin HTTPS | Dominio + Let's Encrypt (necesario para notificaciones push en prod) |
+| SMS depende de proveedor externo | Implementado vía `services/sms.py` — configurable |

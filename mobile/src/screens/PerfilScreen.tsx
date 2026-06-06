@@ -554,26 +554,46 @@ export default function PerfilScreen({ navigation }: Props) {
 
       {/* Avatar y datos */}
       <View style={[styles.profileHeader, { backgroundColor: colors.surface }]}>
-        <View style={[styles.avatarLarge, { backgroundColor: colors.primarySubtle, borderColor: colors.primary }]}>
-          <Text style={[styles.avatarText, { color: colors.primary }]}>{iniciales}</Text>
+        <View style={[styles.avatarLarge, {
+          backgroundColor: usuario ? colors.primarySubtle : colors.surfaceVariant,
+          borderColor: usuario ? colors.primary : colors.border,
+        }]}>
+          {usuario
+            ? <Text style={[styles.avatarText, { color: colors.primary }]}>{iniciales}</Text>
+            : <Ionicons name="person-outline" size={28} color={colors.textDisabled} />
+          }
         </View>
         <View style={styles.profileInfo}>
-          <Text style={[styles.profileName, { color: colors.text }]}>
-            {usuario?.nombre} {usuario?.apellido}
-          </Text>
-          <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-            {usuario?.email}
-          </Text>
-          {usuario?.telefono ? (
-            <Text style={[styles.profileTelefono, { color: colors.textSecondary }]}>
-              {usuario.telefono}
-            </Text>
-          ) : null}
-          <View style={[styles.rolBadge, { backgroundColor: colors.primarySubtle }]}>
-            <Text style={[styles.rolText, { color: colors.primary }]}>
-              {rolLabel[usuario?.rol ?? 'usuario'] ?? 'Usuaria'}
-            </Text>
-          </View>
+          {usuario ? (
+            <>
+              <Text style={[styles.profileName, { color: colors.text }]}>
+                {usuario.nombre} {usuario.apellido}
+              </Text>
+              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                {usuario.email}
+              </Text>
+              {usuario.telefono ? (
+                <Text style={[styles.profileTelefono, { color: colors.textSecondary }]}>
+                  {usuario.telefono}
+                </Text>
+              ) : null}
+              <View style={[styles.rolBadge, { backgroundColor: colors.primarySubtle }]}>
+                <Text style={[styles.rolText, { color: colors.primary }]}>
+                  {rolLabel[usuario.rol ?? 'usuario'] ?? 'Usuaria'}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.profileName, { color: colors.text }]}>Usuaria anónima</Text>
+              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                Sin cuenta — datos solo en este dispositivo
+              </Text>
+              <View style={[styles.rolBadge, { backgroundColor: colors.surfaceVariant }]}>
+                <Text style={[styles.rolText, { color: colors.textSecondary }]}>Modo anónimo</Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
 
@@ -719,29 +739,48 @@ export default function PerfilScreen({ navigation }: Props) {
       {/* Cuenta y seguridad */}
       <Text style={[styles.sectionTitle, { color: colors.text }]}>Cuenta y seguridad</Text>
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
-        <SettingRow
-          icono="person-outline"
-          label="Editar perfil"
-          descripcion="Nombre, teléfono y preferencia de contacto"
-          colors={colors}
-          onPress={() => navigation.navigate('EditarPerfil')}
-        />
-        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-        <SettingRow
-          icono="lock-closed-outline"
-          label="Cambiar contraseña"
-          colors={colors}
-          onPress={() => navigation.navigate('CambiarPassword')}
-        />
-        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
-        <SettingRow
-          icono="log-out-outline"
-          label="Cerrar sesión"
-          colors={colors}
-          peligroso
-          onPress={handleCerrarSesion}
-        />
-        <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+        {usuario ? (
+          <>
+            <SettingRow
+              icono="person-outline"
+              label="Editar perfil"
+              descripcion="Nombre, teléfono y preferencia de contacto"
+              colors={colors}
+              onPress={() => navigation.navigate('EditarPerfil')}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+            <SettingRow
+              icono="lock-closed-outline"
+              label="Cambiar contraseña"
+              colors={colors}
+              onPress={() => navigation.navigate('CambiarPassword')}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+            <SettingRow
+              icono="log-out-outline"
+              label="Cerrar sesión"
+              colors={colors}
+              peligroso
+              onPress={handleCerrarSesion}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          </>
+        ) : (
+          <>
+            <View style={[styles.settingRow, { paddingBottom: 12 }]}>
+              <View style={[styles.settingIconBox, { backgroundColor: colors.primarySubtle }]}>
+                <Ionicons name="person-circle-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.settingContent}>
+                <Text style={[styles.settingLabel, { color: colors.text }]}>Modo anónimo</Text>
+                <Text style={[styles.settingDesc, { color: colors.textSecondary }]}>
+                  Tus datos se guardan solo en este dispositivo. Crea una cuenta para sincronizarlos y poder recuperarlos.
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          </>
+        )}
         <SettingRow
           icono="exit-outline"
           label="Salir y borrar historial visible"

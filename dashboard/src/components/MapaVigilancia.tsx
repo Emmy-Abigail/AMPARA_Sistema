@@ -60,7 +60,7 @@ const LEYENDA: { nivel: NivelRiesgo; color: string; label: string }[] = [
   { nivel: 'moderado', color: '#8B43D4', label: 'Moderado' },
 ];
 
-export function MapaVigilancia({ filtros: _filtros }: Props) {
+export function MapaVigilancia({ filtros: _filtros }: Props) { // eslint-disable-line @typescript-eslint/no-unused-vars
   const { data: denuncias, isLoading } = useMapaDenuncias();
   const total = denuncias?.length ?? 0;
 

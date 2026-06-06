@@ -44,7 +44,7 @@ const ESTADO_VARIANT: Record<EstadoCaso, 'blue' | 'yellow' | 'green' | 'gray' | 
   asignada:               'yellow',
   en_seguimiento:         'yellow',
   derivada:               'green',
-  pendiente_confirmacion: 'orange' as any,
+  pendiente_confirmacion: 'orange',
   cerrada:                'gray',
 };
 

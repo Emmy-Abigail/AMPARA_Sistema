@@ -28,14 +28,13 @@ export const authService = {
   async logout(): Promise<void> {
     try {
       await api.post('/auth/logout');
-    } finally {
-      await Promise.all([
-        storage.removeItem(StorageKeys.AUTH_TOKEN),
-        storage.removeItem(StorageKeys.REFRESH_TOKEN),
-        storage.removeItem(StorageKeys.USER_DATA),
-        storage.removeItem(StorageKeys.MSG_CACHE),
-      ]);
-    }
+    } catch {}
+    await Promise.all([
+      storage.removeItem(StorageKeys.AUTH_TOKEN),
+      storage.removeItem(StorageKeys.REFRESH_TOKEN),
+      storage.removeItem(StorageKeys.USER_DATA),
+      storage.removeItem(StorageKeys.MSG_CACHE),
+    ]);
   },
 
   async updatePerfil(payload: UpdatePerfilPayload): Promise<ApiResponse<Usuario>> {

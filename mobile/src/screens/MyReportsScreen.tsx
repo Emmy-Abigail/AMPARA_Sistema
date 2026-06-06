@@ -140,6 +140,164 @@ function CasoCard({
   );
 }
 
+// ─── Tarjeta SOS ──────────────────────────────────────────────────────────────
+
+function SosCard({
+  alerta,
+  colors,
+  onVerMensajes,
+  onCancelar,
+  cancelando,
+}: {
+  alerta: SosAlertaResponse;
+  colors: ReturnType<typeof useTheme>['colors'];
+  onVerMensajes: () => void;
+  onCancelar: () => void;
+  cancelando: boolean;
+}) {
+  const enAtencion  = alerta.estado === 'en_atencion';
+  const accentColor = enAtencion ? '#EA580C' : '#DC2626';
+  const bgColor     = enAtencion ? '#FFF7ED' : '#FEF2F2';
+  const borderColor = enAtencion ? '#FED7AA' : '#FECACA';
+
+  const hace = (() => {
+    const diff = Date.now() - new Date(alerta.fecha_activacion).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'hace un momento';
+    if (mins < 60) return `hace ${mins} min`;
+    return `hace ${Math.floor(mins / 60)} h`;
+  })();
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={onVerMensajes}
+      style={[sosCardStyles.card, { backgroundColor: bgColor, borderColor }]}
+    >
+      {/* Borde izquierdo de color */}
+      <View style={[sosCardStyles.leftBar, { backgroundColor: accentColor }]} />
+
+      <View style={sosCardStyles.body}>
+        {/* Fila título + estado */}
+        <View style={sosCardStyles.topRow}>
+          <Text style={[sosCardStyles.titulo, { color: accentColor }]}>🆘 Alerta SOS</Text>
+          <View style={[sosCardStyles.estadoBadge, { backgroundColor: accentColor }]}>
+            <Text style={sosCardStyles.estadoText}>
+              {enAtencion ? 'En atención' : 'Activa'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Subtítulo */}
+        <Text style={[sosCardStyles.subtitulo, { color: '#6B7280' }]}>
+          {hace}
+          {alerta.sms_enviados > 0
+            ? `  ·  📨 ${alerta.sms_enviados} SMS enviado${alerta.sms_enviados > 1 ? 's' : ''} al círculo`
+            : ''}
+        </Text>
+
+        {/* Mensaje de estado */}
+        {enAtencion ? (
+          <View style={[sosCardStyles.msgBox, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
+            <Text style={[sosCardStyles.msgText, { color: '#92400E' }]}>
+              Un operador está atendiendo tu alerta. Puedes leer sus mensajes en el chat.
+            </Text>
+          </View>
+        ) : (
+          <View style={[sosCardStyles.msgBox, { backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}>
+            <Text style={[sosCardStyles.msgText, { color: '#991B1B' }]}>
+              Tu alerta fue enviada. Un operador la revisará en breve.
+            </Text>
+          </View>
+        )}
+
+        {/* Acciones */}
+        <View style={sosCardStyles.acciones}>
+          <TouchableOpacity
+            style={[sosCardStyles.btnPrimario, { backgroundColor: accentColor }]}
+            onPress={onVerMensajes}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chatbubbles-outline" size={14} color="#fff" />
+            <Text style={sosCardStyles.btnPrimarioText}>Ver mensajes</Text>
+          </TouchableOpacity>
+
+          {alerta.estado === 'activa' && (
+            <TouchableOpacity
+              style={[sosCardStyles.btnSecundario, { borderColor }]}
+              onPress={onCancelar}
+              disabled={cancelando}
+              activeOpacity={0.8}
+            >
+              {cancelando
+                ? <ActivityIndicator size="small" color={accentColor} />
+                : <Text style={[sosCardStyles.btnSecundarioText, { color: accentColor }]}>Cancelar</Text>
+              }
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      <Ionicons name="chevron-forward" size={16} color={accentColor} style={sosCardStyles.chevron} />
+    </TouchableOpacity>
+  );
+}
+
+const sosCardStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 10,
+    overflow: 'hidden',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  leftBar:  { width: 5 },
+  body:     { flex: 1, padding: 14, gap: 8 },
+  topRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  titulo:   { fontFamily: 'Montserrat-ExtraBold', fontSize: 15 },
+  estadoBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  estadoText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 10, color: '#fff' },
+  subtitulo:  { fontFamily: 'Inter-Regular', fontSize: 12 },
+  msgBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  msgText:  { fontFamily: 'Inter-Regular', fontSize: 12, lineHeight: 18 },
+  acciones: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  btnPrimario: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  btnPrimarioText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#fff' },
+  btnSecundario: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnSecundarioText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 13 },
+  chevron: { alignSelf: 'center', marginRight: 12 },
+});
+
 // ─── Skeleton de carga ────────────────────────────────────────────────────────
 
 function CasoSkeleton({ colors }: { colors: ReturnType<typeof useTheme>['colors'] }) {
@@ -235,8 +393,8 @@ export default function MyReportsScreen({ navigation }: Props) {
   });
 
   const contadores = {
-    todas:    denuncias.length,
-    activas:  denuncias.filter((d) => ESTADOS_ACTIVOS.includes(d.estado)).length,
+    todas:    denuncias.length + sosActivas.length,
+    activas:  denuncias.filter((d) => ESTADOS_ACTIVOS.includes(d.estado)).length + sosActivas.length,
     cerradas: denuncias.filter((d) => d.estado === 'cerrada').length,
   };
 
@@ -307,62 +465,7 @@ export default function MyReportsScreen({ navigation }: Props) {
         </ScrollView>
       </View>
 
-      {/* Alertas SOS activas */}
-      {sosActivas.map((alerta) => {
-        const hace = (() => {
-          const diff = Date.now() - new Date(alerta.fecha_activacion).getTime();
-          const mins = Math.floor(diff / 60000);
-          if (mins < 1) return 'hace un momento';
-          if (mins < 60) return `hace ${mins} min`;
-          return `hace ${Math.floor(mins / 60)} h`;
-        })();
-        const enAtencion = alerta.estado === 'en_atencion';
-        const bannerColor   = enAtencion ? '#FFF7ED' : '#FEF2F2';
-        const borderColor   = enAtencion ? '#FED7AA' : '#FECACA';
-        const accentColor   = enAtencion ? '#EA580C' : '#DC2626';
-        const estadoLabel   = enAtencion ? '🟠 En atención' : '🔴 Activa';
-        return (
-          <View key={alerta.id} style={[styles.sosBanner, { backgroundColor: bannerColor, borderColor }]}>
-            <View style={styles.sosBannerLeft}>
-              <View style={styles.sosIconRow}>
-                <Text style={styles.sosEmoji}>🆘</Text>
-                <Text style={[styles.sosTitle, { color: accentColor }]}>Alerta SOS</Text>
-                <View style={[styles.sosEstadoBadge, { backgroundColor: accentColor + '20' }]}>
-                  <Text style={[styles.sosEstadoText, { color: accentColor }]}>{estadoLabel}</Text>
-                </View>
-              </View>
-              <Text style={[styles.sosSubtitle, { color: '#6B7280' }]}>
-                {hace}
-                {alerta.sms_enviados > 0 ? ` · ${alerta.sms_enviados} SMS enviado${alerta.sms_enviados > 1 ? 's' : ''}` : ''}
-              </Text>
-              {enAtencion && (
-                <Text style={[styles.sosAtencionMsg, { color: accentColor }]}>
-                  Un operador está atendiendo tu alerta
-                </Text>
-              )}
-              {alerta.denuncia_id && (
-                <TouchableOpacity onPress={() => navigation.navigate('ReporteDetalle', { id: alerta.denuncia_id! })}>
-                  <Text style={[styles.sosVerCaso, { color: accentColor }]}>
-                    Ver caso y mensajes del operador →
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {alerta.estado === 'activa' && (
-              <TouchableOpacity
-                style={[styles.sosCancelarBtn, { borderColor }]}
-                onPress={() => handleCancelarSos(alerta.id)}
-                disabled={sosCancelando === alerta.id}
-              >
-                {sosCancelando === alerta.id
-                  ? <ActivityIndicator size="small" color={accentColor} />
-                  : <Text style={[styles.sosCancelarText, { color: accentColor }]}>Cancelar</Text>
-                }
-              </TouchableOpacity>
-            )}
-          </View>
-        );
-      })}
+      {/* Las alertas SOS aparecen integradas en la lista de abajo */}
 
       {/* Acceso por código */}
       <TouchableOpacity
@@ -449,18 +552,46 @@ export default function MyReportsScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={denunciasFiltradas}
-          keyExtractor={(d) => d.id}
-          renderItem={({ item }) => (
-            <CasoCard
-              denuncia={item}
-              colors={colors}
-              onPress={() => navigation.navigate('ReporteDetalle', { id: item.id })}
-            />
-          )}
+          data={[
+            // SOS activas primero (solo en filtro 'todas' o 'activas')
+            ...(filtro !== 'cerradas'
+              ? sosActivas.map((a) => ({ type: 'sos' as const, id: `sos-${a.id}`, alerta: a }))
+              : []),
+            // Casos normales (excluyendo el caso auto-creado por SOS si ya aparece como SOS)
+            ...denunciasFiltradas
+              .filter((d) =>
+                !sosActivas.some((s) => s.denuncia_id === d.id)
+              )
+              .map((d) => ({ type: 'caso' as const, id: d.id, denuncia: d })),
+          ]}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            if (item.type === 'sos') {
+              return (
+                <SosCard
+                  alerta={item.alerta}
+                  colors={colors}
+                  onVerMensajes={() =>
+                    item.alerta.denuncia_id
+                      ? navigation.navigate('ReporteDetalle', { id: item.alerta.denuncia_id })
+                      : undefined
+                  }
+                  onCancelar={() => handleCancelarSos(item.alerta.id)}
+                  cancelando={sosCancelando === item.alerta.id}
+                />
+              );
+            }
+            return (
+              <CasoCard
+                denuncia={item.denuncia}
+                colors={colors}
+                onPress={() => navigation.navigate('ReporteDetalle', { id: item.denuncia.id })}
+              />
+            );
+          }}
           contentContainerStyle={[
             styles.listContent,
-            denunciasFiltradas.length === 0 && styles.listContentEmpty,
+            denunciasFiltradas.length === 0 && sosActivas.length === 0 && styles.listContentEmpty,
             { paddingBottom: insets.bottom + 40 },
           ]}
           ListEmptyComponent={renderVacio}
@@ -582,43 +713,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   anonimaText: { fontFamily: 'Inter-Regular', fontSize: 10 },
-
-  // SOS banner
-  sosBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 8,
-    marginBottom: 4,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    gap: 12,
-  },
-  sosBannerLeft:  { flex: 1, gap: 3 },
-  sosIconRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sosEmoji:       { fontSize: 16 },
-  sosTitle:       { fontFamily: 'Montserrat-ExtraBold', fontSize: 13 },
-  sosSubtitle:    { fontFamily: 'Inter-Regular', fontSize: 12 },
-  sosVerCaso:     { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 2 },
-  sosEstadoBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 4,
-  },
-  sosEstadoText:   { fontFamily: 'Montserrat-ExtraBold', fontSize: 10 },
-  sosAtencionMsg:  { fontFamily: 'Inter-Regular', fontSize: 11, marginTop: 2 },
-  sosCancelarBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    minWidth: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sosCancelarText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 12 },
 
   // Código de acceso
   codigoRow: {

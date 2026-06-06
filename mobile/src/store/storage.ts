@@ -12,6 +12,11 @@ export const StorageKeys = {
   GUEST_MODE:           'ampara_guest_mode',
   NOTIF_CASOS:          'notif_casos',
   NOTIF_MENSAJES:       'notif_mensajes',
+  NOTIF_SILENCIOSO:     'notif_silencioso',     // Modo silencioso total
+  TRUSTED_CONTACT:      'trusted_contact',      // Nombre + número de contacto de confianza
+  // Clave intencionalmente genérica para no revelar la app
+  MSG_CACHE:            '.a_mc_v1',             // Caché de mensajes del operador
+  ICONO_CAMUFLAJE:      'icono_camuflaje',      // 'default' | 'calculator' | 'notes' | 'weather'
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

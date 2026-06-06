@@ -3,11 +3,16 @@ import { obtenerCasosLocales, type CasoLocal } from '../services/casosLocales';
 import type { Denuncia, EstadoCaso, NivelRiesgo, PreferenciaContacto, TipoViolencia, RelacionAgresor } from '../types';
 
 export function casoLocalADenuncia(c: CasoLocal): Denuncia {
+  const tipos = c.tipos_violencia?.length
+    ? c.tipos_violencia as TipoViolencia[]
+    : [c.tipo_violencia as TipoViolencia];
   return {
     id:                   c.denuncia_id ?? c.local_id,
     token_anonimo:        c.token_anonimo,
-    tipo_violencia:       c.tipo_violencia as TipoViolencia,
+    tipos_violencia:      tipos,
+    tipo_violencia:       tipos[0],
     relacion_agresor:     c.relacion_agresor as RelacionAgresor,
+    factores_riesgo:      (c.factores_riesgo ?? []) as any,
     nivel_riesgo:         c.nivel_riesgo as NivelRiesgo,
     hay_heridos:          c.hay_heridos,
     foto_url:             c.foto_url ?? undefined,

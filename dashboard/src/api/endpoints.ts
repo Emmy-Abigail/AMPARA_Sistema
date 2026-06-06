@@ -81,6 +81,12 @@ export const dashboardApi = {
       .then((r) => r.data.data),
 
   // ─── Mensajes ─────────────────────────────────────────────────────────────
+  // GET /denuncias/:id/mensajes — hilo completo (operador + víctima)
+  getMensajes: (denunciaId: string) =>
+    api
+      .get<ApiResponse<MensajeResponse[]>>(`/denuncias/${denunciaId}/mensajes`)
+      .then((r) => r.data.data),
+
   // POST /dashboard/denuncias/:id/mensajes
   sendMensaje: (denunciaId: string, contenido: string, destruirAlLeer: boolean) =>
     api

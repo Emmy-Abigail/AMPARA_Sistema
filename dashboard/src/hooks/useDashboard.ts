@@ -12,6 +12,7 @@ const keys = {
   denuncias:   (f: Partial<Filtros>, pagina: number) =>
                                         ['denuncias', f, pagina]  as const,
   operadores:  ()                    => ['operadores']             as const,
+  mensajes:    (id: string)          => ['mensajes', id]           as const,
 };
 
 const REFETCH_INTERVAL = 60_000; // 1 min
@@ -95,7 +96,18 @@ export function useAsignarOperador() {
   });
 }
 
+export function useMensajes(denunciaId: string, enabled = true) {
+  return useQuery({
+    queryKey: keys.mensajes(denunciaId),
+    queryFn:  () => dashboardApi.getMensajes(denunciaId),
+    enabled,
+    refetchInterval: 20_000,
+    staleTime: 10_000,
+  });
+}
+
 export function useSendMensaje() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
       denunciaId,
@@ -106,5 +118,8 @@ export function useSendMensaje() {
       contenido: string;
       destruirAlLeer: boolean;
     }) => dashboardApi.sendMensaje(denunciaId, contenido, destruirAlLeer),
+    onSuccess: (_data, { denunciaId }) => {
+      qc.invalidateQueries({ queryKey: keys.mensajes(denunciaId) });
+    },
   });
 }

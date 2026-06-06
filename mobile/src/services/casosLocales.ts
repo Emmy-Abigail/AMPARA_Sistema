@@ -8,9 +8,12 @@ const _STORE_KEY = '.a_cl_v1';
 
 export interface CasoLocal {
   token_anonimo:    string;
+  codigo_acceso?:   string;          // código corto de seguimiento
   local_id:         string;
-  tipo_violencia:   string;
+  tipos_violencia:  string[];        // v2 — array
+  tipo_violencia:   string;          // v1 compat — primer tipo del array
   relacion_agresor: string;
+  factores_riesgo?: string[];
   nivel_riesgo:     string;
   hay_heridos:      boolean;
   estado:           string;
@@ -18,7 +21,7 @@ export interface CasoLocal {
   fecha_actualizacion: string;
   denuncia_id:      string | null;
   es_anonima:       boolean;
-  foto_url:         string | null;  // URI local (file://) o URL del servidor
+  foto_url:         string | null;
   descripcion:      string | null;
 }
 
@@ -53,4 +56,8 @@ export async function actualizarCasoLocal(localId: string, cambios: Partial<Caso
     lista[idx] = { ...lista[idx], ...cambios, fecha_actualizacion: new Date().toISOString() };
     await AsyncStorage.setItem(_STORE_KEY, JSON.stringify(lista));
   }
+}
+
+export async function limpiarCasosLocales(): Promise<void> {
+  await AsyncStorage.removeItem(_STORE_KEY);
 }

@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: ampara_backend
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - uploads_data:/app/uploads
     env_file:
@@ -64,7 +64,7 @@ services:
     image: nginx:alpine
     container_name: ampara_dashboard
     ports:
-      - "80:80"
+      - "81:80"
     volumes:
       - ./dashboard/dist:/usr/share/nginx/html:ro
       - ./dashboard/nginx.conf:/etc/nginx/conf.d/default.conf:ro

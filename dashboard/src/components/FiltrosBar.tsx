@@ -18,14 +18,18 @@ const ESTADOS: { value: EstadoCaso; label: string }[] = [
 const NIVELES: { value: NivelRiesgo; label: string }[] = [
   { value: 'urgente',  label: 'Urgente' },
   { value: 'alto',     label: 'Alto' },
+  { value: 'medio',    label: 'Medio' },
+  { value: 'bajo',     label: 'Bajo' },
   { value: 'moderado', label: 'Moderado' },
 ];
 
 const TIPOS: { value: TipoViolencia; label: string }[] = [
   { value: 'Física',      label: 'Física' },
   { value: 'Psicológica', label: 'Psicológica' },
+  { value: 'Verbal',      label: 'Verbal' },
   { value: 'Sexual',      label: 'Sexual' },
   { value: 'Económica',   label: 'Económica' },
+  { value: 'Digital',     label: 'Digital' },
   { value: 'Otra',        label: 'Otra' },
 ];
 

@@ -33,6 +33,7 @@ export const authService = {
         storage.removeItem(StorageKeys.AUTH_TOKEN),
         storage.removeItem(StorageKeys.REFRESH_TOKEN),
         storage.removeItem(StorageKeys.USER_DATA),
+        storage.removeItem(StorageKeys.MSG_CACHE),
       ]);
     }
   },

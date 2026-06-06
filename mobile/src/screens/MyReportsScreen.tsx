@@ -16,6 +16,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useTheme } from '../theme';
+import { useAuth } from '../hooks/useAuth';
 import { useMisDenuncias } from '../hooks/useDenuncias';
 import { useCasosLocales, casoLocalADenuncia } from '../hooks/useCasosLocales';
 import type { MainTabParamList, MainStackParamList, EstadoCaso, NivelRiesgo, Denuncia } from '../types';
@@ -55,6 +56,8 @@ const ESTADO_COLOR = (estado: EstadoCaso, colors: ReturnType<typeof useTheme>['c
 const RIESGO_CONFIG: Record<NivelRiesgo, { label: string; color: string }> = {
   urgente:  { label: 'URGENTE',  color: '#D32F2F' },
   alto:     { label: 'ALTO',     color: '#C2410C' },
+  medio:    { label: 'MEDIO',    color: '#D97706' },
+  bajo:     { label: 'BAJO',     color: '#15803D' },
   moderado: { label: 'MODERADO', color: '#0369A1' },
 };
 
@@ -94,7 +97,7 @@ function CasoCard({
         {/* Fila superior: tipo + badge urgente */}
         <View style={styles.cardTopRow}>
           <Text style={[styles.cardTipo, { color: colors.text }]} numberOfLines={1}>
-            {denuncia.tipo_violencia}
+            {denuncia.tipos_violencia?.join(', ') ?? denuncia.tipo_violencia}
           </Text>
           {denuncia.hay_heridos && (
             <View style={[styles.urgenteBadge, { backgroundColor: '#D32F2F' }]}>
@@ -153,11 +156,12 @@ function CasoSkeleton({ colors }: { colors: ReturnType<typeof useTheme>['colors'
 
 export default function MyReportsScreen({ navigation }: Props) {
   const { colors }    = useTheme();
+  const { usuario }   = useAuth();
   const insets        = useSafeAreaInsets();
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useMisDenuncias();
+  const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useMisDenuncias(1, !!usuario);
   const { casosComoDenuncia, isLoading: localLoading, refetch: refetchLocal } = useCasosLocales();
 
   const onRefresh = useCallback(async () => {

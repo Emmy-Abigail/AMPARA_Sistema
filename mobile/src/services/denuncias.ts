@@ -81,4 +81,16 @@ export const denunciasService = {
   async marcarMensajeLeido(mensajeId: string): Promise<void> {
     await api.patch(`/denuncias/mensajes/${mensajeId}/leer`);
   },
+
+  async responderMensaje(
+    denunciaId: string,
+    contenido: string,
+    tokenAnonimo?: string,
+  ): Promise<MensajeCaso> {
+    const { data } = await api.post<ApiResponse<MensajeCaso>>(
+      `/denuncias/${denunciaId}/mensajes/responder`,
+      { contenido, token_anonimo: tokenAnonimo ?? null },
+    );
+    return data.data;
+  },
 };

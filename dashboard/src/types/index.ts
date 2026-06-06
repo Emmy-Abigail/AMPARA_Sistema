@@ -1,8 +1,9 @@
 // ─── Enums (espejo de app/schemas/enums.py) ───────────────────────────────────
 
-export type TipoViolencia = 'Física' | 'Psicológica' | 'Sexual' | 'Económica' | 'Otra';
-export type RelacionAgresor = 'Cónyuge' | 'Expareja' | 'Familiar' | 'Conocido' | 'Desconocido';
-export type NivelRiesgo = 'urgente' | 'alto' | 'moderado';
+export type TipoViolencia = 'Física' | 'Psicológica' | 'Verbal' | 'Sexual' | 'Económica' | 'Digital' | 'Otra';
+export type RelacionAgresor = 'Pareja o expareja' | 'Familiar' | 'Conocido/a' | 'Figura de autoridad' | 'Desconocido/a'
+  | 'Cónyuge' | 'Expareja' | 'Conocido' | 'Desconocido'; // compat v1
+export type NivelRiesgo = 'urgente' | 'alto' | 'medio' | 'bajo' | 'moderado';
 export type PreferenciaContacto = 'app' | 'llamada' | 'ninguno';
 export type EstadoCaso =
   | 'nueva'
@@ -44,10 +45,14 @@ export interface KpisData {
 export interface Denuncia {
   id: string;
   token_anonimo: string;
+  codigo_acceso?: string;
+  tipos_violencia?: TipoViolencia[];
   tipo_violencia: TipoViolencia;
   relacion_agresor: RelacionAgresor;
+  factores_riesgo?: string[];
   nivel_riesgo: NivelRiesgo;
   hay_heridos: boolean;
+  descripcion?: string | null;
   foto_url: string | null;
   audio_url: string | null;
   latitud: number | null;
@@ -86,7 +91,7 @@ export interface Operador {
 export interface MensajeResponse {
   id: string;
   denuncia_id: string;
-  autor: 'operador' | 'sistema';
+  autor: 'operador' | 'sistema' | 'usuaria';
   contenido: string;
   destruir_al_leer: boolean;
   leido: boolean;

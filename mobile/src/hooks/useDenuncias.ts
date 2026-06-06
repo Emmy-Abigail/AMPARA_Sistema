@@ -10,10 +10,11 @@ export const denunciasKeys = {
   mensajes:(id: string)    => [...denunciasKeys.all, 'mensajes', id] as const,
 };
 
-export function useMisDenuncias(pagina = 1) {
+export function useMisDenuncias(pagina = 1, enabled = true) {
   return useQuery({
     queryKey: denunciasKeys.mis(),
     queryFn:  () => denunciasService.listarMisDenuncias(pagina),
+    enabled,
   });
 }
 
@@ -48,6 +49,17 @@ export function useCrearDenuncia() {
     mutationFn: (payload: CrearDenunciaPayload) => denunciasService.crear(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: denunciasKeys.mis() });
+    },
+  });
+}
+
+export function useResponderMensaje(denunciaId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contenido, tokenAnonimo }: { contenido: string; tokenAnonimo?: string }) =>
+      denunciasService.responderMensaje(denunciaId, contenido, tokenAnonimo),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: denunciasKeys.mensajes(denunciaId) });
     },
   });
 }

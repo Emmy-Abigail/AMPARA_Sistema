@@ -1,10 +1,9 @@
-//navigation - index.tsx
-
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme';
 import { useAuthContext } from '../store/auth-context';
@@ -15,28 +14,24 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import ReportScreen from '../screens/ReportScreen';
+import SOSScreen from '../screens/SOSScreen';
 import MyReportsScreen from '../screens/MyReportsScreen';
 import InfoScreen from '../screens/InfoScreen';
 import ReporteDetalleScreen from '../screens/ReporteDetalleScreen';
 import PerfilScreen from '../screens/PerfilScreen';
 import EditarPerfilScreen from '../screens/EditarPerfilScreen';
 import CambiarPasswordScreen from '../screens/CambiarPasswordScreen';
-import type { MainStackParamList } from '../types';
-
-const MainStack = createNativeStackNavigator<MainStackParamList>();
-
-
 import type {
   RootStackParamList,
   AuthStackParamList,
   MainTabParamList,
+  MainStackParamList,
 } from '../types';
 
-// ─── Stacks y Tab ─────────────────────────────────────────────────────────────
-
-const RootStack = createNativeStackNavigator<RootStackParamList>();
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const MainTab = createBottomTabNavigator<MainTabParamList>();
+const RootStack  = createNativeStackNavigator<RootStackParamList>();
+const AuthStack  = createNativeStackNavigator<AuthStackParamList>();
+const MainTab    = createBottomTabNavigator<MainTabParamList>();
+const MainStack  = createNativeStackNavigator<MainStackParamList>();
 
 // ─── Stack de autenticación ───────────────────────────────────────────────────
 
@@ -52,46 +47,26 @@ function AuthNavigator() {
         gestureDirection: 'horizontal',
       }}
     >
-      <AuthStack.Screen name="Welcome" component={WelcomeScreen} />
-      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Welcome"  component={WelcomeScreen} />
+      <AuthStack.Screen name="Login"    component={LoginScreen}   />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
     </AuthStack.Navigator>
   );
 }
 
-// ─── Configuración de iconos por tab ─────────────────────────────────────────
+// ─── Bottom Tab principal (5 tabs, SOS central) ───────────────────────────────
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_CONFIG: Record<
-  keyof MainTabParamList,
+  Exclude<keyof MainTabParamList, 'SOS'>,
   { label: string; icon: IoniconName; iconActive: IoniconName }
 > = {
-  Home: {
-    label: 'Inicio',
-    icon: 'home-outline',
-    iconActive: 'home',
-  },
-  Report: {
-    label: 'Denunciar',
-    icon: 'alert-circle-outline',
-    iconActive: 'alert-circle',
-  },
-  MyReports: {
-    label: 'Mis casos',
-    icon: 'folder-outline',
-    iconActive: 'folder',
-  },
-  Info: {
-    label: 'Recursos',
-    icon: 'heart-outline',
-    iconActive: 'heart',
-  },
+  Home:      { label: 'Inicio',    icon: 'home-outline',      iconActive: 'home'        },
+  Report:    { label: 'Reportar',  icon: 'document-text-outline', iconActive: 'document-text' },
+  MyReports: { label: 'Mis casos', icon: 'folder-outline',    iconActive: 'folder'      },
+  Info:      { label: 'Recursos',  icon: 'heart-outline',     iconActive: 'heart'       },
 };
-
-// ─── Bottom Tab principal ─────────────────────────────────────────────────────
-
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function TabNavigator() {
   const { colors } = useTheme();
@@ -101,7 +76,8 @@ function TabNavigator() {
     <MainTab.Navigator
       id="MainTab"
       screenOptions={({ route }) => {
-        const config = TAB_CONFIG[route.name as keyof MainTabParamList];
+        if (route.name === 'SOS') return { headerShown: false };
+        const config = TAB_CONFIG[route.name as keyof typeof TAB_CONFIG];
         return {
           headerShown: false,
           tabBarIcon: ({ focused, size }) => (
@@ -125,7 +101,7 @@ function TabNavigator() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             borderTopWidth: StyleSheet.hairlineWidth,
-            height: 56 + insets.bottom,
+            height: 60 + insets.bottom,
             paddingBottom: insets.bottom || 8,
             paddingTop: 8,
             elevation: 8,
@@ -134,29 +110,44 @@ function TabNavigator() {
             shadowOpacity: 0.12,
             shadowRadius: 8,
           },
-          tabBarItemStyle:
-            route.name === 'Report' ? styles.reportTabItem : undefined,
         };
       }}
     >
-      <MainTab.Screen name="Home" component={HomeScreen} />
+      <MainTab.Screen name="Home"      component={HomeScreen}      />
+      <MainTab.Screen name="Report"    component={ReportScreen}    />
+
+      {/* SOS — botón central elevado, rojo, accesible siempre */}
       <MainTab.Screen
-        name="Report"
-        component={ReportScreen}
+        name="SOS"
+        component={SOSScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.reportBtn, { backgroundColor: colors.primary }]}>
-              <Ionicons
-                name={focused ? 'alert-circle' : 'alert-circle-outline'}
-                size={28}
-                color={colors.textOnPrimary}
-              />
+            <View style={[styles.sosTabBtn, focused && styles.sosTabBtnActive]}>
+              <Ionicons name="warning" size={26} color="#FFFFFF" />
             </View>
           ),
+          tabBarLabel: () => (
+            <Text style={styles.sosTabLabel}>SOS</Text>
+          ),
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom || 8,
+            paddingTop: 8,
+            elevation: 8,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 8,
+          },
+          tabBarItemStyle: styles.sosTabItem,
         }}
       />
+
       <MainTab.Screen name="MyReports" component={MyReportsScreen} />
-      <MainTab.Screen name="Info" component={InfoScreen} />
+      <MainTab.Screen name="Info"      component={InfoScreen}      />
     </MainTab.Navigator>
   );
 }
@@ -193,15 +184,10 @@ function MainNavigator() {
 
 export default function RootNavigator() {
   const { isAuthenticated, splashShown } = useAuthContext();
-
   return (
     <RootStack.Navigator
       id="RootStack"
-      screenOptions={{
-        headerShown: false,
-        animation: 'fade',
-        animationDuration: 300,
-      }}
+      screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 300 }}
     >
       {!splashShown ? (
         <RootStack.Screen name="Splash" component={SplashScreen} />
@@ -214,7 +200,7 @@ export default function RootNavigator() {
   );
 }
 
-// ─── Estilos ─────────────────────────────────────────────────────────────────
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   tabLabel: {
@@ -227,21 +213,33 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
-  reportTabItem: {
+
+  // SOS tab — botón circular elevado y rojo
+  sosTabItem: {
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? -18 : -14, // eleva el botón sobre el tab bar
   },
-  reportBtn: {
-    width: 52,
-    height: 40,
-    borderRadius: 15,
-    justifyContent: 'center',
+  sosTabBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#E53935',
     alignItems: 'center',
-    marginBottom: Platform.OS === 'ios' ? 8 : 4,
-    shadowColor: '#7C3AED',
+    justifyContent: 'center',
+    shadowColor: '#E53935',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sosTabBtnActive: {
+    backgroundColor: '#B71C1C',
+  },
+  sosTabLabel: {
+    fontFamily: 'Montserrat-ExtraBold',
+    fontSize: 10,
+    color: '#E53935',
+    marginTop: 2,
   },
 });

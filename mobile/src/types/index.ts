@@ -46,18 +46,38 @@ export interface CambiarPasswordPayload {
   password_nuevo: string;
 }
 
-// ─── Dominio — Denuncia ───────────────────────────────────────────────────────
+// ─── Dominio — Violencia ──────────────────────────────────────────────────────
 
-export type TipoViolencia = 'Física' | 'Psicológica' | 'Sexual' | 'Económica' | 'Otra';
+export type TipoViolencia =
+  | 'Física'
+  | 'Psicológica'
+  | 'Verbal'
+  | 'Sexual'
+  | 'Económica'
+  | 'Digital'
+  | 'Otra'; // compat v1
 
 export type RelacionAgresor =
+  | 'Pareja o expareja'
+  | 'Familiar'
+  | 'Conocido/a'
+  | 'Figura de autoridad'
+  | 'Desconocido/a'
+  // compat v1 — no se muestran en el formulario, solo en datos históricos
   | 'Cónyuge'
   | 'Expareja'
-  | 'Familiar'
   | 'Conocido'
   | 'Desconocido';
 
-export type NivelRiesgo = 'urgente' | 'alto' | 'moderado';
+export type FactorRiesgo =
+  | 'amenazas_muerte'
+  | 'acceso_armas'
+  | 'violencia_escalando'
+  | 'convive'
+  | 'seguimiento_vigilancia'
+  | 'orden_alejamiento_violada';
+
+export type NivelRiesgo = 'urgente' | 'alto' | 'medio' | 'bajo' | 'moderado'; // 'moderado' compat v1
 
 export type PreferenciaContacto = 'app' | 'llamada' | 'ninguno';
 
@@ -69,11 +89,16 @@ export type EstadoCaso =
   | 'pendiente_confirmacion'
   | 'cerrada';
 
+// ─── Dominio — Denuncia ───────────────────────────────────────────────────────
+
 export interface Denuncia {
   id: string;
   token_anonimo: string;
-  tipo_violencia: TipoViolencia;
+  codigo_acceso?: string;             // código corto amigable (6 chars) para seguimiento anónimo
+  tipos_violencia: TipoViolencia[];   // v2 — array multi-select
+  tipo_violencia?: TipoViolencia;     // v1 compat — puede estar ausente en nuevos registros
   relacion_agresor: RelacionAgresor;
+  factores_riesgo?: FactorRiesgo[];
   nivel_riesgo: NivelRiesgo;
   hay_heridos: boolean;
   foto_url?: string;
@@ -90,8 +115,9 @@ export interface Denuncia {
 }
 
 export interface CrearDenunciaPayload {
-  tipo_violencia: TipoViolencia;
+  tipos_violencia: TipoViolencia[];
   relacion_agresor: RelacionAgresor;
+  factores_riesgo?: FactorRiesgo[];
   hay_heridos: boolean;
   foto_url?: string;
   audio_url?: string;
@@ -102,6 +128,8 @@ export interface CrearDenunciaPayload {
   descripcion?: string;
   device_id?: string;
   local_id?: string;
+  token_anonimo?: string;
+  codigo_acceso?: string;
 }
 
 // ─── Mensajes operador ↔ víctima ──────────────────────────────────────────────
@@ -109,11 +137,25 @@ export interface CrearDenunciaPayload {
 export interface MensajeCaso {
   id: string;
   denuncia_id: string;
-  autor: 'operador' | 'sistema';
+  autor: 'operador' | 'sistema' | 'usuaria';
   contenido: string;
   destruir_al_leer: boolean;
   leido: boolean;
   created_at: string;
+}
+
+export interface ResponderMensajePayload {
+  contenido: string;
+  token_anonimo?: string;
+}
+
+// ─── SOS ──────────────────────────────────────────────────────────────────────
+
+export interface SosAlertaPayload {
+  latitud?: number;
+  longitud?: number;
+  denuncia_id?: string;
+  device_id?: string;
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
@@ -154,6 +196,7 @@ export type AuthStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Report: undefined;
+  SOS: undefined;
   MyReports: undefined;
   Info: undefined;
 };

@@ -1,3 +1,4 @@
+import json
 import secrets
 import uuid
 from typing import Optional
@@ -12,12 +13,18 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.security import get_current_user
-from app.models.denuncia import Denuncia, _calcular_nivel_riesgo
+from app.models.denuncia import Denuncia, calcular_nivel_riesgo
 from app.models.mensaje_caso import MensajeCaso
 from app.models.usuario import Usuario
-from app.schemas.denuncia import DenunciaCreate, DenunciaResumen, DenunciaResponse
+from app.schemas.denuncia import (
+    DenunciaCreate,
+    DenunciaResumen,
+    DenunciaResponse,
+    MensajeResponderCreate,
+)
 from app.schemas.mensaje import MensajeResponse
 from app.schemas.responses import ApiResponse, PaginatedData
+from app.services.notifications import enviar_notificacion_respuesta_operador
 from app.services.storage import storage
 
 router = APIRouter(tags=["Denuncias"])
@@ -29,6 +36,10 @@ def _generar_token_anonimo() -> str:
     parte1 = "".join(secrets.choice(_TOKEN_CHARS) for _ in range(4))
     parte2 = "".join(secrets.choice(_TOKEN_CHARS) for _ in range(4))
     return f"AMP-{parte1}-{parte2}"
+
+
+def _generar_codigo_acceso() -> str:
+    return "".join(secrets.choice(_TOKEN_CHARS) for _ in range(6))
 
 
 async def _resolve_optional_user(
@@ -122,7 +133,7 @@ async def crear_denuncia(
         )
         existente = result.scalar_one_or_none()
         if existente:
-            return ApiResponse(data=DenunciaResponse.model_validate(existente))
+            return ApiResponse(data=DenunciaResponse.from_orm_extended(existente))
 
     usuario = await _resolve_optional_user(authorization, db)
 
@@ -135,15 +146,27 @@ async def crear_denuncia(
     if not token_anonimo:
         token_anonimo = _generar_token_anonimo()
 
-    nivel_riesgo = _calcular_nivel_riesgo(data.relacion_agresor.value, data.hay_heridos)
+    tipos_lista  = [t.value for t in data.tipos_violencia]
+    factores_lista = [f.value for f in data.factores_riesgo]
+    nivel_riesgo = data.nivel_riesgo_calculado()
+
+    # Cliente puede proponer su propio codigo_acceso (generado offline); lo usamos si no colisiona
+    codigo_acceso_propuesto = data.codigo_acceso.upper() if data.codigo_acceso else None
+    if codigo_acceso_propuesto:
+        result = await db.execute(select(Denuncia).where(Denuncia.codigo_acceso == codigo_acceso_propuesto))
+        if result.scalar_one_or_none():
+            codigo_acceso_propuesto = None  # colisión improbable — genera uno nuevo
 
     denuncia = Denuncia(
         usuario_id=           usuario.id if usuario else None,
         token_anonimo=        token_anonimo,
+        codigo_acceso=        codigo_acceso_propuesto or _generar_codigo_acceso(),
         device_id=            data.device_id,
         local_id=             data.local_id,
-        tipo_violencia=       data.tipo_violencia.value,
+        tipo_violencia=       tipos_lista[0],
+        tipos_violencia=      json.dumps(tipos_lista, ensure_ascii=False),
         relacion_agresor=     data.relacion_agresor.value,
+        factores_riesgo=      json.dumps(factores_lista, ensure_ascii=False),
         nivel_riesgo=         nivel_riesgo,
         hay_heridos=          data.hay_heridos,
         foto_url=             data.foto_url,
@@ -152,6 +175,7 @@ async def crear_denuncia(
         longitud=             data.longitud,
         preferencia_contacto= data.preferencia_contacto.value,
         horario_contacto=     data.horario_contacto,
+        descripcion=          data.descripcion,
         es_anonima=           usuario is None,
     )
 
@@ -163,7 +187,7 @@ async def crear_denuncia(
     await db.refresh(denuncia)
 
     return ApiResponse(
-        data=DenunciaResponse.model_validate(denuncia),
+        data=DenunciaResponse.from_orm_extended(denuncia),
         mensaje="Denuncia registrada correctamente",
     )
 
@@ -197,9 +221,25 @@ async def mis_denuncias(
     denuncias = result.scalars().all()
 
     return ApiResponse(data=PaginatedData(
-        data=[DenunciaResumen.model_validate(d) for d in denuncias],
+        data=[DenunciaResumen.from_orm_extended(d) for d in denuncias],
         total=total, pagina=pagina, porPagina=porPagina,
     ))
+
+
+# ─── Acceso anónimo por código corto ─────────────────────────────────────────
+
+@router.get("/acceso-anonimo", response_model=ApiResponse[DenunciaResumen])
+async def acceso_anonimo(
+    codigo: str = Query(..., min_length=4, max_length=6),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Denuncia).where(Denuncia.codigo_acceso == codigo.upper())
+    )
+    denuncia = result.scalar_one_or_none()
+    if not denuncia:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Código no encontrado")
+    return ApiResponse(data=DenunciaResumen.from_orm_extended(denuncia))
 
 
 # ─── Obtener por token anónimo (público) ──────────────────────────────────────
@@ -210,7 +250,7 @@ async def get_por_token(token_anonimo: str, db: AsyncSession = Depends(get_db)):
     denuncia = result.scalar_one_or_none()
     if not denuncia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
-    return ApiResponse(data=DenunciaResumen.model_validate(denuncia))
+    return ApiResponse(data=DenunciaResumen.from_orm_extended(denuncia))
 
 
 # ─── Obtener por ID ───────────────────────────────────────────────────────────
@@ -232,7 +272,7 @@ async def get_denuncia(
     if not es_propietario and not es_staff:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta denuncia")
 
-    return ApiResponse(data=DenunciaResponse.model_validate(denuncia))
+    return ApiResponse(data=DenunciaResponse.from_orm_extended(denuncia))
 
 
 # ─── Mensajes de un caso ──────────────────────────────────────────────────────
@@ -261,6 +301,56 @@ async def get_mensajes(
     )
     mensajes = result.scalars().all()
     return ApiResponse(data=[MensajeResponse.model_validate(m) for m in mensajes])
+
+
+# ─── Respuesta de la usuaria a un caso ───────────────────────────────────────
+
+@router.post("/{denuncia_id}/mensajes/responder", response_model=ApiResponse[MensajeResponse], status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
+async def responder_mensaje(
+    request: Request,
+    denuncia_id: uuid.UUID,
+    data: MensajeResponderCreate,
+    authorization: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Denuncia).where(Denuncia.id == denuncia_id))
+    denuncia = result.scalar_one_or_none()
+    if not denuncia:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
+
+    usuario = await _resolve_optional_user(authorization, db)
+    es_propietario = usuario and denuncia.usuario_id == usuario.id
+
+    # Acceso: usuaria autenticada que es propietaria, O acceso por token_anonimo
+    if not es_propietario:
+        if not data.token_anonimo or data.token_anonimo != denuncia.token_anonimo:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta denuncia")
+
+    mensaje = MensajeCaso(
+        denuncia_id=     denuncia_id,
+        autor=           "usuaria",
+        contenido=       data.contenido,
+        destruir_al_leer=False,
+    )
+    db.add(mensaje)
+    await db.flush()
+    await db.refresh(mensaje)
+
+    # Notificar al operador asignado si tiene push token registrado
+    if denuncia.operador_id:
+        operador_result = await db.execute(
+            select(Usuario).where(Usuario.id == denuncia.operador_id)
+        )
+        operador = operador_result.scalar_one_or_none()
+        if operador and operador.push_token:
+            await enviar_notificacion_respuesta_operador(
+                push_token=    operador.push_token,
+                denuncia_id=   str(denuncia_id),
+                codigo_acceso= denuncia.codigo_acceso,
+            )
+
+    return ApiResponse(data=MensajeResponse.model_validate(mensaje))
 
 
 # ─── Marcar mensaje como leído ────────────────────────────────────────────────

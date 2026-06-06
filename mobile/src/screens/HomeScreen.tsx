@@ -18,7 +18,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useMisDenuncias } from '../hooks/useDenuncias';
 import { useCasosLocales } from '../hooks/useCasosLocales';
 import type { AppColors } from '../theme';
-import type { MainTabParamList, MainStackParamList, EstadoCaso, Denuncia } from '../types';
+import type { MainTabParamList, MainStackParamList, EstadoCaso, Denuncia, MensajeCaso } from '../types';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -65,7 +65,9 @@ function CasoCard({ caso, colors, onPress }: { caso: Denuncia; colors: AppColors
         <Ionicons name={config.icono as any} size={20} color={config.color} />
       </View>
       <View style={styles.casoContent}>
-        <Text style={[styles.casoTipo, { color: colors.text }]}>{caso.tipo_violencia}</Text>
+        <Text style={[styles.casoTipo, { color: colors.text }]}>
+          {caso.tipos_violencia?.join(', ') ?? caso.tipo_violencia}
+        </Text>
         <Text style={[styles.casoFecha, { color: colors.textSecondary }]}>{fecha}</Text>
         <View style={[styles.casoEstadoBadge, { backgroundColor: config.color }]}>
           <Text style={styles.casoEstadoText}>{config.label}</Text>
@@ -85,13 +87,12 @@ function CasoCard({ caso, colors, onPress }: { caso: Denuncia; colors: AppColors
 export default function HomeScreen({ navigation }: Props) {
   const { colors }  = useTheme();
   const { usuario } = useAuth();
-  const { data: apiData, isLoading: apiLoading } = useMisDenuncias();
+  const { data: apiData, isLoading: apiLoading } = useMisDenuncias(1, !!usuario);
   const { casosComoDenuncia, isLoading: localLoading } = useCasosLocales();
   const insets = useSafeAreaInsets();
 
-  const primerNombre = usuario?.nombre?.split(' ')[0] ?? 'Usuaria';
+  const primerNombre = usuario?.nombre?.split(' ')[0] ?? null;
 
-  // Datos del servidor si están disponibles, local como fallback inmediato
   const denuncias: Denuncia[] = apiData?.data ?? casosComoDenuncia;
   const isLoading = apiLoading && localLoading && denuncias.length === 0;
 
@@ -99,6 +100,11 @@ export default function HomeScreen({ navigation }: Props) {
   const activas  = denuncias.filter((d) => d.estado !== 'cerrada').length;
   const cerradas = denuncias.filter((d) => d.estado === 'cerrada').length;
   const recientes = denuncias.slice(0, 3);
+
+  // Badge de mensaje del operador no leído — busca en el primer caso activo
+  const casoConMensaje = recientes.find((d) =>
+    d.estado !== 'cerrada' && d.id && false // TODO: conectar con useMensajesCaso cuando haya n+1 caching
+  );
 
   return (
     <ScrollView
@@ -110,10 +116,10 @@ export default function HomeScreen({ navigation }: Props) {
       <View style={styles.saludoRow}>
         <View style={styles.saludoTexts}>
           <Text style={[styles.saludo, { color: colors.text }]}>
-            Hola, {primerNombre}
+            {primerNombre ? `Hola, ${primerNombre} 💜` : 'Hola, bienvenida 💜'}
           </Text>
           <Text style={[styles.saludoSub, { color: colors.textSecondary }]}>
-            Estás acompañada en cada paso
+            {primerNombre ? 'Estás acompañada en cada paso' : 'Este es un espacio seguro para ti'}
           </Text>
         </View>
         <TouchableOpacity
@@ -122,22 +128,52 @@ export default function HomeScreen({ navigation }: Props) {
           activeOpacity={0.75}
         >
           <Text style={[styles.avatarInitial, { color: colors.primary }]}>
-            {primerNombre.charAt(0).toUpperCase()}
+            {primerNombre ? primerNombre.charAt(0).toUpperCase() : '?'}
           </Text>
         </TouchableOpacity>
       </View>
 
+      {/* ── Banner SOS — SIEMPRE PRIMERO ── */}
+      <TouchableOpacity
+        style={styles.sosBanner}
+        onPress={() => navigation.navigate('SOS')}
+        activeOpacity={0.88}
+      >
+        <View style={styles.sosBannerIconBox}>
+          <Ionicons name="warning" size={22} color="#FFFFFF" />
+        </View>
+        <View style={styles.sosBannerTexts}>
+          <Text style={styles.sosBannerTitle}>¿Necesitas ayuda ahora?</Text>
+          <Text style={styles.sosBannerSub}>Pedir ayuda de emergencia →</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* ── Badge de mensaje del operador (si existe no leído) ── */}
+      {casoConMensaje && (
+        <TouchableOpacity
+          style={[styles.mensajeBadge, { backgroundColor: colors.primarySubtle, borderColor: colors.primary }]}
+          onPress={() => navigation.navigate('ReporteDetalle', { id: casoConMensaje.id })}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chatbubble-outline" size={16} color={colors.primary} />
+          <Text style={[styles.mensajeBadgeText, { color: colors.primary }]}>
+            El operador de tu caso te dejó un mensaje
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
       {/* ── Botón denunciar ── */}
       <TouchableOpacity
-        style={[styles.denunciarButton, { backgroundColor: colors.primary }]}
+        style={[styles.denunciarButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
         onPress={() => navigation.navigate('Report')}
         activeOpacity={0.85}
       >
-        <Ionicons name="alert-circle-outline" size={22} color={colors.textOnPrimary} />
-        <Text style={[styles.denunciarButtonText, { color: colors.textOnPrimary }]}>
-          Hacer una denuncia ahora
+        <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+        <Text style={[styles.denunciarButtonText, { color: colors.primary }]}>
+          Hacer una denuncia
         </Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textOnPrimary} />
+        <Ionicons name="chevron-forward" size={16} color={colors.textDisabled} />
       </TouchableOpacity>
 
       {/* ── KPIs ── */}
@@ -217,14 +253,66 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
 
+  // SOS banner
+  sosBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#E53935',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#E53935',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  sosBannerIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sosBannerTexts: { flex: 1 },
+  sosBannerTitle: {
+    fontFamily: 'Montserrat-ExtraBold',
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  sosBannerSub: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+
+  // Badge mensaje operador
+  mensajeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  mensajeBadgeText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 13,
+    flex: 1,
+  },
+
   denunciarButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
+    gap: 10,
+    padding: 14,
     borderRadius: 14,
     marginBottom: 28,
-    gap: 10,
+    borderWidth: 1.5,
   },
   denunciarButtonText: {
     fontFamily: 'Montserrat-ExtraBold',

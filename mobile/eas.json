@@ -24,7 +24,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://161.132.53.226/api/v1"
+        "EXPO_PUBLIC_API_URL": "http://161.132.53.226:8001/api/v1"
       }
     },
     "production": {
@@ -33,7 +33,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.sivapre.gob/api/v1"
+        "EXPO_PUBLIC_API_URL": "http://161.132.53.226:8001/api/v1"
       }
     }
   },

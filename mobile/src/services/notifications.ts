@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { api } from './api';
+import { storage, StorageKeys } from '../store/storage';
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
@@ -10,13 +11,27 @@ export function initNotificationHandler(): void {
   if (isExpoGo) return;
   try {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      handleNotification: async () => {
+        const silencioso = await storage.getItem(StorageKeys.NOTIF_SILENCIOSO);
+        // Modo silencioso total: sin ninguna señal visible o sonora en ningún estado de la app.
+        if (silencioso === 'true') {
+          return {
+            shouldShowAlert:  false,
+            shouldPlaySound:  false,
+            shouldSetBadge:   false,
+            shouldShowBanner: false,
+            shouldShowList:   false,
+          };
+        }
+        // Comportamiento normal: sin sonido ni banner, solo badge + lista del sistema.
+        return {
+          shouldShowAlert:  false,
+          shouldPlaySound:  false,
+          shouldSetBadge:   true,
+          shouldShowBanner: false,
+          shouldShowList:   true,
+        };
+      },
     });
   } catch {
     // expo-notifications no disponible
@@ -28,11 +43,15 @@ export async function registrarPushToken(): Promise<void> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('denuncias', {
-      name: 'Estado de casos',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#7C3AED',
-      sound: 'default',
+      name: 'Ampara',
+      importance: Notifications.AndroidImportance.DEFAULT, // No HIGH — evita preview en lock screen
+      vibrationPattern: [0, 150],                          // 1 pulso corto de 150ms
+      sound: null,                                         // Sin sonido
+      // PRIVATE oculta el contenido en la pantalla bloqueada; solo muestra "Ampara"
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+      bypassDnd: false,
+      enableVibrate: true,
+      showBadge: true,
     });
   }
 

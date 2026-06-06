@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -8,21 +8,25 @@ import {
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useDenuncias, useCambiarEstado, useAsignarOperador, useOperadores, useSendMensaje } from '../hooks/useDashboard';
+import { useDenuncias, useCambiarEstado, useAsignarOperador, useOperadores, useSendMensaje, useMensajes } from '../hooks/useDashboard';
 import type { Filtros, Denuncia, EstadoCaso, NivelRiesgo } from '../types';
 import { Badge } from './ui/Badge';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function nivelVariant(n: NivelRiesgo): 'red' | 'yellow' | 'purple' {
-  if (n === 'urgente') return 'red';
-  if (n === 'alto')    return 'yellow';
-  return 'purple';
+function nivelVariant(n: NivelRiesgo): 'red' | 'yellow' | 'green' | 'purple' {
+  if (n === 'urgente')            return 'red';
+  if (n === 'alto')               return 'yellow';
+  if (n === 'medio')              return 'yellow';
+  if (n === 'bajo')               return 'green';
+  return 'purple'; // moderado (compat v1)
 }
 
 function nivelColor(n: NivelRiesgo): string {
   if (n === 'urgente') return '#EF4444';
   if (n === 'alto')    return '#F59E0B';
+  if (n === 'medio')   return '#D97706';
+  if (n === 'bajo')    return '#16A34A';
   return '#8B43D4';
 }
 
@@ -116,13 +120,19 @@ function Evidencia({ fotoUrl, audioUrl }: { fotoUrl?: string | null; audioUrl?: 
   );
 }
 
-// ─── Formulario de mensaje a víctima ─────────────────────────────────────────
+// ─── Hilo de mensajes bidireccional ──────────────────────────────────────────
 
-function MensajeForm({ denunciaId }: { denunciaId: string }) {
+function HiloMensajes({ denunciaId }: { denunciaId: string }) {
+  const { data: mensajes = [], isLoading } = useMensajes(denunciaId, true);
   const [texto, setTexto] = useState('');
   const [destruir, setDestruir] = useState(false);
-  const [sent, setSent] = useState(false);
   const { mutate: send, isPending } = useSendMensaje();
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Scroll al último mensaje al cargar o al recibir nuevos
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [mensajes.length]);
 
   const handleSend = () => {
     if (!texto.trim()) return;
@@ -132,29 +142,85 @@ function MensajeForm({ denunciaId }: { denunciaId: string }) {
         onSuccess: () => {
           setTexto('');
           setDestruir(false);
-          setSent(true);
-          setTimeout(() => setSent(false), 3000);
         },
       },
     );
   };
 
+  const hayRespuestaVictima = mensajes.some((m) => m.autor === 'usuaria');
+
   return (
     <div>
-      <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Mensaje a la víctima</p>
-      {sent && (
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-2 text-xs text-emerald-700 font-semibold">
-          <CheckCircle size={13} /> Mensaje enviado
-        </div>
-      )}
+      <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        Conversación
+        {hayRespuestaVictima && (
+          <span className="bg-emerald-100 text-emerald-700 font-bold text-[9px] px-1.5 py-0.5 rounded-full uppercase tracking-wide">
+            Víctima respondió
+          </span>
+        )}
+      </p>
+
+      {/* Hilo */}
+      <div className="bg-white border border-[#EBE3F9] rounded-xl p-2 mb-2 max-h-48 overflow-y-auto flex flex-col gap-2">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-12">
+            <div className="w-4 h-4 border-2 border-[#8B43D4] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : mensajes.length === 0 ? (
+          <p className="text-[10px] text-[#B09CC8] text-center py-3">Sin mensajes aún</p>
+        ) : (
+          mensajes.map((m) => {
+            const esVictima = m.autor === 'usuaria';
+            const esSistema = m.autor === 'sistema';
+            const hora = format(new Date(m.created_at), 'HH:mm');
+
+            if (esSistema) {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <span className="text-[9px] text-[#B09CC8] bg-[#F3EFFE] px-2 py-0.5 rounded-full">
+                    {m.contenido}
+                  </span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={m.id} className={`flex ${esVictima ? 'justify-start' : 'justify-end'}`}>
+                <div
+                  className={`max-w-[75%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                    esVictima
+                      ? 'bg-gray-100 text-gray-800 rounded-tl-sm'
+                      : 'bg-[#8B43D4] text-white rounded-tr-sm'
+                  }`}
+                >
+                  {m.contenido === '[Mensaje eliminado]' ? (
+                    <span className="italic opacity-60">{m.contenido}</span>
+                  ) : (
+                    m.contenido
+                  )}
+                  <div className={`text-[9px] mt-1 ${esVictima ? 'text-gray-400' : 'text-purple-200'} text-right`}>
+                    {esVictima ? 'Víctima' : 'Tú'} · {hora}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Redactar */}
       <textarea
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         placeholder='Ej: "Una patrulla está en camino, mantente a salvo"'
-        rows={3}
+        rows={2}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSend();
+        }}
         className="w-full text-xs border border-[#DDD0F5] rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:border-[#8B43D4] focus:ring-2 focus:ring-[#8B43D4]/20 text-[#1A0A2E] placeholder-[#B09CC8] bg-white"
       />
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-1.5">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <div
             onClick={() => setDestruir((v) => !v)}
@@ -171,14 +237,14 @@ function MensajeForm({ denunciaId }: { denunciaId: string }) {
           disabled={!texto.trim() || isPending}
           className="flex items-center gap-1.5 bg-[#8B43D4] hover:bg-[#6E2DB0] text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {isPending ? (
-            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Send size={11} />
-          )}
+          {isPending
+            ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : <Send size={11} />
+          }
           Enviar
         </button>
       </div>
+      <p className="text-[9px] text-[#B09CC8] mt-1">Ctrl+Enter para enviar · Actualiza cada 20 s</p>
     </div>
   );
 }
@@ -244,7 +310,7 @@ function ExpedienteCard({ denuncia }: { denuncia: Denuncia }) {
           {/* Título + estado */}
           <div className="flex items-start justify-between gap-2 mb-1">
             <p className="text-xs font-bold text-[#1A0A2E] leading-snug">
-              {denuncia.tipo_violencia}
+              {denuncia.tipos_violencia?.join(' · ') ?? denuncia.tipo_violencia}
               <span className="font-normal text-[#5E4480]"> · {denuncia.relacion_agresor}</span>
             </p>
             <Badge variant={ESTADO_VARIANT[denuncia.estado]}>
@@ -320,6 +386,30 @@ function ExpedienteCard({ denuncia }: { denuncia: Denuncia }) {
               )}
             </div>
           </div>
+
+          {/* Factores de riesgo */}
+          {denuncia.factores_riesgo && denuncia.factores_riesgo.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Factores de riesgo</p>
+              <div className="flex flex-wrap gap-1.5">
+                {denuncia.factores_riesgo.map((f) => (
+                  <span key={f} className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-medium">
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Descripción adicional */}
+          {denuncia.descripcion && (
+            <div>
+              <p className="text-[10px] font-bold text-[#5E4480] uppercase tracking-wider mb-2">Descripción</p>
+              <p className="text-xs text-[#1A0A2E] bg-white rounded-xl border border-[#EBE3F9] px-3 py-2.5 leading-relaxed">
+                {denuncia.descripcion}
+              </p>
+            </div>
+          )}
 
           {/* Acciones — solo si no está cerrada */}
           {!esCerrada && (
@@ -417,8 +507,8 @@ function ExpedienteCard({ denuncia }: { denuncia: Denuncia }) {
                 </div>
               )}
 
-              {/* Mensaje a la víctima */}
-              <MensajeForm denunciaId={denuncia.id} />
+              {/* Conversación bidireccional */}
+              <HiloMensajes denunciaId={denuncia.id} />
             </>
           )}
 

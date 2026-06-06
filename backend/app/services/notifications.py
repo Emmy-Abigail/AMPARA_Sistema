@@ -68,3 +68,38 @@ async def enviar_notificacion_mensaje(push_token: str, preview: str = "") -> boo
     except Exception as exc:
         logger.error("Error enviando push notification de mensaje: %s", exc)
         return False
+
+
+async def enviar_notificacion_respuesta_operador(
+    push_token: str,
+    denuncia_id: str,
+    codigo_acceso: str,
+) -> bool:
+    """Notifica al operador asignado cuando la víctima responde en su caso."""
+    if not push_token or not push_token.startswith("ExponentPushToken"):
+        return False
+
+    payload = {
+        "to":        push_token,
+        "title":     "Respuesta recibida",
+        "body":      f"La usuaria del caso {codigo_acceso} te ha respondido.",
+        "sound":     "default",
+        "channelId": "denuncias",
+        "data":      {"denuncia_id": denuncia_id, "tipo": "respuesta_victima"},
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                EXPO_PUSH_URL,
+                json=payload,
+                headers={"Accept": "application/json", "Content-Type": "application/json"},
+            )
+            result = resp.json()
+            if result.get("data", {}).get("status") == "error":
+                logger.warning("Expo push error (operador): %s", result)
+                return False
+            return True
+    except Exception as exc:
+        logger.error("Error enviando push al operador: %s", exc)
+        return False

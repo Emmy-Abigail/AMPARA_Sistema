@@ -6,7 +6,7 @@
 // - Los registros enviados se limpian a los 7 días.
 
 import * as SQLite from 'expo-sqlite';
-import type { TipoViolencia, RelacionAgresor, PreferenciaContacto } from '../types';
+import type { TipoViolencia, RelacionAgresor, PreferenciaContacto, FactorRiesgo } from '../types';
 
 export type PendingDenunciaStatus = 'pendiente' | 'enviando' | 'enviada' | 'fallida';
 
@@ -15,7 +15,10 @@ export interface PendingDenuncia {
   local_id: string;
   device_id: string;
   token_anonimo: string;
-  tipo_violencia: TipoViolencia;
+  codigo_acceso: string | null;   // código corto de seguimiento (6 chars)
+  tipo_violencia: TipoViolencia;  // v1 compat — primer tipo seleccionado
+  tipos_violencia: string | null; // v2 — JSON array de tipos
+  factores_riesgo: string | null; // v2 — JSON array de factores
   relacion_agresor: RelacionAgresor;
   hay_heridos: number;
   foto_local_uri: string | null;
@@ -45,37 +48,44 @@ function getDb(): SQLite.SQLiteDatabase {
 export function initDb(): void {
   getDb().execSync(`
     CREATE TABLE IF NOT EXISTS pending_denuncias (
-      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      local_id            TEXT    NOT NULL UNIQUE,
-      device_id           TEXT    NOT NULL,
-      token_anonimo       TEXT    NOT NULL,
-      tipo_violencia      TEXT    NOT NULL,
-      relacion_agresor    TEXT    NOT NULL,
-      hay_heridos         INTEGER NOT NULL DEFAULT 0,
-      foto_local_uri      TEXT,
-      foto_url            TEXT,
-      audio_local_uri     TEXT,
-      audio_url           TEXT,
-      latitud             REAL,
-      longitud            REAL,
-      preferencia_contacto TEXT   NOT NULL DEFAULT 'ninguno',
-      horario_contacto    TEXT,
-      descripcion         TEXT,
-      estado              TEXT    NOT NULL DEFAULT 'pendiente',
-      created_at          TEXT    NOT NULL,
-      updated_at          TEXT    NOT NULL,
-      last_sync_attempt   TEXT,
-      http_status         INTEGER,
-      server_response     TEXT,
-      retry_count         INTEGER NOT NULL DEFAULT 0
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      local_id             TEXT    NOT NULL UNIQUE,
+      device_id            TEXT    NOT NULL,
+      token_anonimo        TEXT    NOT NULL,
+      codigo_acceso        TEXT,
+      tipo_violencia       TEXT    NOT NULL,
+      tipos_violencia      TEXT,
+      factores_riesgo      TEXT,
+      relacion_agresor     TEXT    NOT NULL,
+      hay_heridos          INTEGER NOT NULL DEFAULT 0,
+      foto_local_uri       TEXT,
+      foto_url             TEXT,
+      audio_local_uri      TEXT,
+      audio_url            TEXT,
+      latitud              REAL,
+      longitud             REAL,
+      preferencia_contacto TEXT    NOT NULL DEFAULT 'ninguno',
+      horario_contacto     TEXT,
+      descripcion          TEXT,
+      estado               TEXT    NOT NULL DEFAULT 'pendiente',
+      created_at           TEXT    NOT NULL,
+      updated_at           TEXT    NOT NULL,
+      last_sync_attempt    TEXT,
+      http_status          INTEGER,
+      server_response      TEXT,
+      retry_count          INTEGER NOT NULL DEFAULT 0
     );
   `);
 
-  // Migración: agregar columna descripcion a instalaciones previas
-  try {
-    getDb().execSync(`ALTER TABLE pending_denuncias ADD COLUMN descripcion TEXT`);
-  } catch {
-    // Columna ya existe — ignorar
+  // Migraciones incrementales — seguro ejecutar en cada arranque
+  const migraciones = [
+    `ALTER TABLE pending_denuncias ADD COLUMN descripcion TEXT`,
+    `ALTER TABLE pending_denuncias ADD COLUMN tipos_violencia TEXT`,
+    `ALTER TABLE pending_denuncias ADD COLUMN factores_riesgo TEXT`,
+    `ALTER TABLE pending_denuncias ADD COLUMN codigo_acceso TEXT`,
+  ];
+  for (const sql of migraciones) {
+    try { getDb().execSync(sql); } catch { /* columna ya existe */ }
   }
 
   // Resetear registros atascados en 'enviando' (crash durante sync anterior)
@@ -91,8 +101,10 @@ export async function insertPendingDenuncia(d: {
   local_id: string;
   device_id: string;
   token_anonimo: string;
-  tipo_violencia: TipoViolencia;
+  codigo_acceso?: string | null;
+  tipos_violencia: TipoViolencia[];
   relacion_agresor: RelacionAgresor;
+  factores_riesgo?: FactorRiesgo[];
   hay_heridos: boolean;
   foto_local_uri?: string | null;
   audio_local_uri?: string | null;
@@ -103,17 +115,21 @@ export async function insertPendingDenuncia(d: {
   descripcion?: string | null;
 }): Promise<void> {
   const now = new Date().toISOString();
+  const primerTipo = d.tipos_violencia[0] ?? 'Física';
   const params: Record<string, string | number> = {
     $local_id:             d.local_id,
     $device_id:            d.device_id,
     $token_anonimo:        d.token_anonimo,
-    $tipo_violencia:       d.tipo_violencia,
+    $tipo_violencia:       primerTipo,
+    $tipos_violencia:      JSON.stringify(d.tipos_violencia),
+    $factores_riesgo:      JSON.stringify(d.factores_riesgo ?? []),
     $relacion_agresor:     d.relacion_agresor,
     $hay_heridos:          d.hay_heridos ? 1 : 0,
     $preferencia_contacto: d.preferencia_contacto,
     $created_at:           now,
     $updated_at:           now,
   };
+  if (d.codigo_acceso)    params.$codigo_acceso    = d.codigo_acceso;
   if (d.foto_local_uri)   params.$foto_local_uri   = d.foto_local_uri;
   if (d.audio_local_uri)  params.$audio_local_uri  = d.audio_local_uri;
   if (d.latitud != null)  params.$latitud           = d.latitud;
@@ -123,13 +139,13 @@ export async function insertPendingDenuncia(d: {
 
   await getDb().runAsync(
     `INSERT OR IGNORE INTO pending_denuncias
-       (local_id, device_id, token_anonimo, tipo_violencia, relacion_agresor,
-        hay_heridos, foto_local_uri, foto_url, audio_local_uri, audio_url,
+       (local_id, device_id, token_anonimo, codigo_acceso, tipo_violencia, tipos_violencia, factores_riesgo,
+        relacion_agresor, hay_heridos, foto_local_uri, foto_url, audio_local_uri, audio_url,
         latitud, longitud, preferencia_contacto, horario_contacto, descripcion,
         estado, created_at, updated_at)
      VALUES
-       ($local_id, $device_id, $token_anonimo, $tipo_violencia, $relacion_agresor,
-        $hay_heridos, $foto_local_uri, NULL, $audio_local_uri, NULL,
+       ($local_id, $device_id, $token_anonimo, $codigo_acceso, $tipo_violencia, $tipos_violencia, $factores_riesgo,
+        $relacion_agresor, $hay_heridos, $foto_local_uri, NULL, $audio_local_uri, NULL,
         $latitud, $longitud, $preferencia_contacto, $horario_contacto, $descripcion,
         'pendiente', $created_at, $updated_at)`,
     params,

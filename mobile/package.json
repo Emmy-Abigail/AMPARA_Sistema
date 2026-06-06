@@ -21,6 +21,7 @@
     "@tanstack/react-query": "^5.99.0",
     "axios": "^1.15.0",
     "expo": "~54.0.33",
+    "expo-alternate-app-icon": "~2.0.0",
     "expo-background-fetch": "~13.0.4",
     "expo-build-properties": "~1.0.10",
     "expo-camera": "~17.0.10",

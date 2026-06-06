@@ -21,7 +21,7 @@ import {
   updateMediaUrls,
   cleanOldSentDenuncias,
 } from './db';
-import type { TipoViolencia, RelacionAgresor, PreferenciaContacto } from '../types';
+import type { TipoViolencia, RelacionAgresor, PreferenciaContacto, FactorRiesgo } from '../types';
 
 let isSyncing = false;
 
@@ -59,9 +59,18 @@ export async function syncPendingDenuncias(): Promise<void> {
       }
 
       try {
+        const tiposRaw: TipoViolencia[] = denuncia.tipos_violencia
+          ? (JSON.parse(denuncia.tipos_violencia) as TipoViolencia[])
+          : [denuncia.tipo_violencia as TipoViolencia];
+
+        const factoresRaw: FactorRiesgo[] = denuncia.factores_riesgo
+          ? (JSON.parse(denuncia.factores_riesgo) as FactorRiesgo[])
+          : [];
+
         const { status, data } = await denunciasService.crearRaw({
-          tipo_violencia:      denuncia.tipo_violencia as TipoViolencia,
+          tipos_violencia:     tiposRaw,
           relacion_agresor:    denuncia.relacion_agresor as RelacionAgresor,
+          factores_riesgo:     factoresRaw,
           hay_heridos:         denuncia.hay_heridos === 1,
           foto_url:            fotoUrl ?? undefined,
           audio_url:           audioUrl ?? undefined,
@@ -69,8 +78,11 @@ export async function syncPendingDenuncias(): Promise<void> {
           longitud:            denuncia.longitud ?? undefined,
           preferencia_contacto: denuncia.preferencia_contacto as PreferenciaContacto,
           horario_contacto:    denuncia.horario_contacto ?? undefined,
+          descripcion:         denuncia.descripcion ?? undefined,
           device_id:           denuncia.device_id,
           local_id:            denuncia.local_id,
+          token_anonimo:       denuncia.token_anonimo,
+          codigo_acceso:       denuncia.codigo_acceso ?? undefined,
         });
 
         markAsSent(denuncia.id, status, JSON.stringify(data) ?? '{}');

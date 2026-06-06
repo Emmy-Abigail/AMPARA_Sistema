@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -13,6 +14,7 @@ from app.core.database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
+bearer_optional = HTTPBearer(auto_error=False)
 
 
 # ─── Contraseñas ─────────────────────────────────────────────────────────────
@@ -85,3 +87,31 @@ async def get_current_user(
             detail="Usuario inactivo",
         )
     return user
+
+
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_optional),
+    db: AsyncSession = Depends(get_db),
+) -> Optional["Usuario"]:  # noqa: F821
+    """Como get_current_user pero devuelve None si no hay token (endpoints públicos-opcionales)."""
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+        )
+        if payload.get("type") != "access":
+            return None
+        email: str | None = payload.get("sub")
+        if not email:
+            return None
+    except JWTError:
+        return None
+
+    from app.models.usuario import Usuario
+
+    result = await db.execute(select(Usuario).where(Usuario.email == email))
+    user = result.scalar_one_or_none()
+    return user if (user and user.es_activo) else None

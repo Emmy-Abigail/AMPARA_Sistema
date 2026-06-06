@@ -45,6 +45,18 @@ class Settings(BaseSettings):
     # Generar con: openssl rand -hex 32
     ADMIN_SECRET_KEY: str = "cambiar-en-produccion"
 
+    # ─── Twilio SMS ───────────────────────────────────────────────────────────
+    # Necesario para notificar al círculo de confianza cuando se activa el SOS.
+    # Sin estas variables el sistema funciona igual pero registra el SMS en logs.
+    TWILIO_ACCOUNT_SID:  str | None = None
+    TWILIO_AUTH_TOKEN:   str | None = None
+    TWILIO_FROM_NUMBER:  str | None = None  # formato E.164: +15551234567
+
+    # ─── Mininter ArcGIS ──────────────────────────────────────────────────────
+    # Base URL del servicio REST de comisarías de Mininter.
+    # El endpoint real está en el portal ArcGIS de Mininter.
+    MININTER_ARCGIS_URL: str = "https://aplicaciones.mininter.gob.pe/arcgis/rest/services"
+
     # ─── CORS ─────────────────────────────────────────────────────────────────
     # Lista de orígenes permitidos para el dashboard web.
     # La app móvil no usa CORS (cliente nativo), solo el navegador del dashboard.

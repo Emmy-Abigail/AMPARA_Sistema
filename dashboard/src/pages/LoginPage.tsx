@@ -127,7 +127,7 @@ function DecorativePanel() {
       {/* Footer del panel */}
       <div style={{ padding: '16px 48px', borderTop: '1px solid rgba(139,67,212,0.2)', zIndex: 10 }}>
         <p style={{ color: 'rgba(176,123,230,0.45)', fontSize: 11, textAlign: 'center', letterSpacing: '0.04em' }}>
-          Acceso exclusivo para personal autorizado · Ampara © 2025
+          Acceso exclusivo para personal autorizado · Ampara © 2026
         </p>
       </div>
     </div>

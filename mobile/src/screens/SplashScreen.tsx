@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useAuthContext } from '../store/auth-context';
 
 const LOGO = require('../../assets/ampara-logo.png');
@@ -8,24 +9,21 @@ const LOGO = require('../../assets/ampara-logo.png');
 export default function SplashScreen() {
   const { setSplashShown } = useAuthContext();
 
-  const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(32)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
   const barAnim   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Logo aparece con fade + slide suave
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1, duration: 700, useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0, duration: 700, useNativeDriver: true,
-      }),
-    ]).start();
+    // Ocultar el splash nativo justo cuando este componente ya está pintado
+    ExpoSplashScreen.hideAsync();
 
-    // Barra de carga arranca después del logo
+    // Logo sube suavemente desde abajo
+    Animated.timing(slideAnim, {
+      toValue: 0, duration: 600, useNativeDriver: true,
+    }).start();
+
+    // Barra de carga
     Animated.timing(barAnim, {
-      toValue: 1, duration: 1600, delay: 500, useNativeDriver: false,
+      toValue: 1, duration: 1800, delay: 300, useNativeDriver: false,
     }).start();
 
     const timer = setTimeout(() => setSplashShown(true), 2500);
@@ -45,10 +43,7 @@ export default function SplashScreen() {
       style={styles.screen}
     >
       <Animated.View
-        style={[
-          styles.content,
-          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
-        ]}
+        style={[styles.content, { transform: [{ translateY: slideAnim }] }]}
       >
         {/* Logo en tarjeta blanca redondeada */}
         <View style={styles.logoCard}>
@@ -58,6 +53,9 @@ export default function SplashScreen() {
         {/* Nombre de la app */}
         <Text style={styles.appName}>ampara</Text>
 
+        {/* Frase */}
+        <Text style={styles.tagline}>No estás sola</Text>
+
         {/* Barra de progreso */}
         <View style={styles.barTrack}>
           <Animated.View style={[styles.barFill, { width: barWidth }]} />
@@ -65,9 +63,7 @@ export default function SplashScreen() {
       </Animated.View>
 
       {/* Versión */}
-      <Animated.Text style={[styles.version, { opacity: fadeAnim }]}>
-        v1.0
-      </Animated.Text>
+      <Text style={styles.version}>v1.0</Text>
     </LinearGradient>
   );
 }
@@ -83,7 +79,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  // Logo
   logoCard: {
     width: 130,
     height: 130,
@@ -101,17 +96,23 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
-  // Nombre
   appName: {
     fontFamily: 'Montserrat-ExtraBold',
     fontSize: 36,
     letterSpacing: 1.5,
     color: '#FFFFFF',
     marginTop: 28,
+    marginBottom: 6,
+  },
+
+  tagline: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    letterSpacing: 0.4,
+    color: 'rgba(255,255,255,0.6)',
     marginBottom: 40,
   },
 
-  // Barra de carga
   barTrack: {
     width: 100,
     height: 3,
@@ -125,7 +126,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.7)',
   },
 
-  // Versión
   version: {
     position: 'absolute',
     bottom: 40,

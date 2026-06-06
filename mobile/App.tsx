@@ -1,6 +1,6 @@
 // App.tsx
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
@@ -66,19 +66,12 @@ export default function App() {
     'Montserrat-ExtraBold': require('./assets/fonts/Montserrat-ExtraBold.ttf'),
   });
 
-  // Se dispara cuando el View raíz termina de posicionarse (fuentes ya listas)
-  const onRootLayout = useCallback(async () => {
-    if (fontsLoaded || fontError) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
   useEffect(() => {
     if (fontsLoaded) {
       markFontsReady();
     }
     if (fontError) {
-      console.warn('[SIVAPRE] Error cargando fuentes locales:', fontError.message);
+      console.warn('[Ampara] Error cargando fuentes locales:', fontError.message);
     }
   }, [fontsLoaded, fontError]);
 
@@ -92,7 +85,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
           <AuthProvider>
-            <View style={styles.root} onLayout={onRootLayout}>
+            <View style={styles.root}>
               <AppContent />
             </View>
           </AuthProvider>

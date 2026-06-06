@@ -21,38 +21,47 @@ Cómo actualizar el sistema en el VPS, construir nuevas versiones del APK, hacer
 
 ## 1. Estado actual de producción
 
-| Componente | Dirección | Estado |
-|---|---|---|
-| Dashboard | `http://161.132.53.226` | Activo |
-| API | `http://161.132.53.226/api/v1` | Activo |
-| Fotos y audio | `http://161.132.53.226/uploads/*` | Activo |
-| APK (preview) | expo.dev → proyecto ampara | Activo |
+| Componente | Servidor | Dirección | Acceso |
+|---|---|---|---|
+| API (backend) | VPS pública | `http://161.132.53.226/api/v1` | Internet — app móvil |
+| Dashboard | Raspberry Pi | `http://10.234.162.153` | Solo red local — operadores |
+| Base de datos | Raspberry Pi | interno | Solo red local |
+| Fotos y audio | Raspberry Pi | `http://10.234.162.153/uploads/*` | Solo red local |
+| APK (preview) | expo.dev | expo.dev → proyecto ampara | Internet |
 
 ### Cómo está organizado
 
-Todo corre en un solo VPS con Docker Compose:
+La arquitectura usa dos servidores con roles distintos:
 
+**VPS pública (`161.132.53.226`)** — punto de entrada para la app móvil:
 ```
-VPS: 161.132.53.226
-├── ampara_dashboard (nginx, puerto 80)   ← único punto de entrada
 ├── ampara_backend  (FastAPI, puerto 8000) ← interno
-├── ampara_db       (PostgreSQL, puerto 5432) ← interno
-└── ampara_redis    (Redis, puerto 6379)  ← interno
+└── nginx           (puerto 80)            ← público, solo /api/*
 ```
 
-El repositorio está en `~/ampara` del VPS. Los datos persisten en volúmenes Docker que **sobreviven** a reinicios y a `docker compose down`.
+**Raspberry Pi (`10.234.162.153`)** — servidor local dedicado para operadores:
+```
+├── ampara_dashboard (nginx, puerto 80)        ← red local únicamente
+├── ampara_backend   (FastAPI, puerto 8000)    ← interno
+├── ampara_db        (PostgreSQL, puerto 5432) ← interno
+└── ampara_redis     (Redis, puerto 6379)      ← interno
+```
+
+El repositorio está en `~/ampara` de la Pi. Los datos persisten en volúmenes Docker que **sobreviven** a reinicios y a `docker compose down`.
 
 ---
 
-## 2. Conectarse al VPS
+## 2. Conectarse a los servidores
 
 ```bash
-ssh abigail@10.234.162.153   # red local (Pi / VPS local)
-# o
-ssh usuario@161.132.53.226   # VPS público
+# Raspberry Pi (desde la red local de la organización)
+ssh abigail@10.234.162.153
+
+# VPS pública (desde cualquier lugar)
+ssh usuario@161.132.53.226
 ```
 
-Una vez conectado:
+Una vez conectado en cualquiera de los dos:
 
 ```bash
 cd ~/ampara

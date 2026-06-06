@@ -1,6 +1,6 @@
 # Dashboard Web — Ampara
 
-Panel de gestión de casos para operadores y administradores. Construido con React + Vite. Accesible desde cualquier navegador en `http://161.132.53.226`.
+Panel de gestión de casos para operadores y administradores. Construido con React + Vite. Corre en la **Raspberry Pi local** (`http://10.234.162.153`) — solo accesible desde la red interna de la organización, nunca expuesto a internet.
 
 ---
 

@@ -97,8 +97,10 @@ Ver la carpeta [`docs/`](./docs/) para la documentación técnica completa.
 
 ## Producción
 
-| Servicio | URL |
-|---|---|
-| Dashboard | http://161.132.53.226 |
-| API | http://161.132.53.226/api/v1 |
-| APK (Android) | expo.dev → proyecto ampara → último build preview |
+| Servicio | Servidor | URL | Acceso |
+|---|---|---|---|
+| API (backend) | VPS pública | http://161.132.53.226/api/v1 | Internet — app móvil |
+| Dashboard | Raspberry Pi | http://10.234.162.153 | Solo red local — operadores |
+| APK (Android) | expo.dev | expo.dev → proyecto ampara | Internet |
+
+La Pi corre el stack completo de gestión (dashboard + BD + backend). Al estar en red local, los datos de las víctimas nunca quedan expuestos en internet.

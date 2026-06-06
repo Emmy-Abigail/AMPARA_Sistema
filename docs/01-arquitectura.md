@@ -96,19 +96,51 @@ La app puede usarse sin crear cuenta. En ese modo:
 
 ## Infraestructura en producción
 
+La arquitectura separa deliberadamente la capa pública de la capa privada:
+
 ```
-VPS: 161.132.53.226
-│
-└── docker-compose.yml
-    ├── ampara_dashboard (nginx)          → puerto 80 público
-    ├── ampara_backend   (FastAPI)        → interno, puerto 8000
-    ├── ampara_db        (PostgreSQL + PostGIS) → interno, puerto 5432
-    └── ampara_redis     (Redis)          → interno, puerto 6379
+INTERNET
+    │
+    │  App móvil (cualquier usuaria, desde cualquier lugar)
+    ▼
+VPS pública — 161.132.53.226
+    ├── Recibe denuncias cifradas en tránsito
+    ├── Sirve la API al APK
+    └── No tiene dashboard expuesto, no gestiona casos
+    │
+    │  Solo datos de denuncias viajan aquí (cifrados)
+    ▼
+Raspberry Pi — 10.234.162.153 (red local de la organización)
+    ├── Dashboard web para operadores
+    ├── Base de datos completa (PostgreSQL + PostGIS)
+    ├── Toda la gestión de casos, mensajería, evidencia
+    └── INACCESIBLE desde internet — solo red local
 ```
 
-Todo el tráfico externo entra por el **puerto 80**. Los demás puertos son internos a la red Docker y no están expuestos al exterior.
+**Por qué esta separación:**
+- La Pi nunca es alcanzable desde fuera de la organización — para ver el dashboard hay que estar en la red local o con VPN
+- Los datos de víctimas (identidad, ubicación, historial) nunca quedan expuestos en un servidor de nube
+- La VPS solo actúa como punto de entrada para la app móvil
 
-Los datos persisten en volúmenes Docker:
+### VPS pública (`161.132.53.226`)
+
+```
+docker-compose.yml
+├── ampara_backend (FastAPI) → puerto 8000 interno, expuesto en /api/* via nginx
+└── nginx              → puerto 80 público
+```
+
+### Raspberry Pi (`10.234.162.153`) — servidor local dedicado
+
+```
+docker-compose.yml
+├── ampara_dashboard (nginx)               → puerto 80, solo red local
+├── ampara_backend   (FastAPI)             → puerto 8000 interno
+├── ampara_db        (PostgreSQL + PostGIS) → puerto 5432 interno
+└── ampara_redis     (Redis)               → puerto 6379 interno
+```
+
+Los datos persisten en volúmenes Docker de la Pi:
 - `postgres_data` → base de datos ⚠️ nunca borrar
 - `uploads_data` → fotos y audios ⚠️ nunca borrar
 - `redis_data` → contadores de rate limiting (no crítico)

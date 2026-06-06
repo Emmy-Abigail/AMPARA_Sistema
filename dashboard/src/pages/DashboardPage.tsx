@@ -13,8 +13,9 @@ import type { Filtros } from '../types';
 type Page = 'dashboard' | 'personal';
 
 export function DashboardPage() {
-  const [filtros, setFiltros] = useState<Partial<Filtros>>({});
-  const [page, setPage] = useState<Page>('dashboard');
+  const [filtros, setFiltros]                   = useState<Partial<Filtros>>({});
+  const [page, setPage]                         = useState<Page>('dashboard');
+  const [selectedDenunciaId, setSelectedDenunciaId] = useState<string | null>(null);
 
   const subtitle = useMemo(() => {
     const s = new Date().toLocaleDateString('es-PE', {
@@ -45,10 +46,17 @@ export function DashboardPage() {
               <KpiCards filtros={filtros} />
               <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-4">
                 <div className="xl:col-span-3">
-                  <MapaVigilancia filtros={filtros} />
+                  <MapaVigilancia
+                    filtros={filtros}
+                    onSelectDenuncia={setSelectedDenunciaId}
+                  />
                 </div>
-                <div className="xl:col-span-2">
-                  <FeedAcciones filtros={filtros} />
+                <div className="xl:col-span-2" id="expedientes-panel">
+                  <FeedAcciones
+                    filtros={filtros}
+                    selectedId={selectedDenunciaId}
+                    onClearSelected={() => setSelectedDenunciaId(null)}
+                  />
                 </div>
               </div>
               <TendenciasChart filtros={filtros} />

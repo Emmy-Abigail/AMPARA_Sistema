@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -19,6 +20,8 @@ import { useTheme } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 import { useMisDenuncias } from '../hooks/useDenuncias';
 import { useCasosLocales, casoLocalADenuncia } from '../hooks/useCasosLocales';
+import { denunciasService } from '../services/denuncias';
+import { listarMisAlertas, cancelarSosAlerta, type SosAlertaResponse } from '../services/sos';
 import type { MainTabParamList, MainStackParamList, EstadoCaso, NivelRiesgo, Denuncia } from '../types';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -161,6 +164,48 @@ export default function MyReportsScreen({ navigation }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [refreshing, setRefreshing] = useState(false);
 
+  // ── Alertas SOS ──────────────────────────────────────────────────────────
+  const [sosAlertas, setSosAlertas]       = useState<SosAlertaResponse[]>([]);
+  const [sosCancelando, setSosCancelando] = useState<string | null>(null);
+
+  useEffect(() => {
+    listarMisAlertas().then(setSosAlertas).catch(() => {});
+  }, []);
+
+  const handleCancelarSos = async (id: string) => {
+    setSosCancelando(id);
+    try {
+      await cancelarSosAlerta(id);
+      setSosAlertas((prev) => prev.filter((a) => a.id !== id));
+    } finally {
+      setSosCancelando(null);
+    }
+  };
+
+  const sosActivas = sosAlertas.filter((a) => a.estado === 'activa');
+
+  // ── Acceso por código ────────────────────────────────────────────────────
+  const [codigoExpanded, setCodigoExpanded] = useState(false);
+  const [codigoInput, setCodigoInput]       = useState('');
+  const [codigoBuscando, setCodigoBuscando] = useState(false);
+  const [codigoError, setCodigoError]       = useState('');
+
+  const buscarPorCodigo = async () => {
+    if (codigoInput.trim().length < 4) return;
+    setCodigoBuscando(true);
+    setCodigoError('');
+    try {
+      const result = await denunciasService.buscarPorCodigo(codigoInput);
+      navigation.navigate('ReporteDetalle', { id: result.id });
+      setCodigoInput('');
+      setCodigoExpanded(false);
+    } catch {
+      setCodigoError('Código no encontrado. Verifica que sea correcto.');
+    } finally {
+      setCodigoBuscando(false);
+    }
+  };
+
   const { data: apiData, isLoading: apiLoading, isError: apiError, refetch } = useMisDenuncias(1, !!usuario);
   const { casosComoDenuncia, isLoading: localLoading, refetch: refetchLocal } = useCasosLocales();
 
@@ -255,6 +300,104 @@ export default function MyReportsScreen({ navigation }: Props) {
           })}
         </ScrollView>
       </View>
+
+      {/* Alertas SOS activas */}
+      {sosActivas.map((alerta) => {
+        const hace = (() => {
+          const diff = Date.now() - new Date(alerta.fecha_activacion).getTime();
+          const mins = Math.floor(diff / 60000);
+          if (mins < 1) return 'hace un momento';
+          if (mins < 60) return `hace ${mins} min`;
+          return `hace ${Math.floor(mins / 60)} h`;
+        })();
+        return (
+          <View key={alerta.id} style={[styles.sosBanner, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+            <View style={styles.sosBannerLeft}>
+              <View style={styles.sosIconRow}>
+                <Text style={styles.sosEmoji}>🆘</Text>
+                <Text style={[styles.sosTitle, { color: '#DC2626' }]}>Alerta SOS activa</Text>
+              </View>
+              <Text style={[styles.sosSubtitle, { color: '#6B7280' }]}>
+                {hace}
+                {alerta.sms_enviados > 0 ? ` · ${alerta.sms_enviados} SMS enviado${alerta.sms_enviados > 1 ? 's' : ''}` : ''}
+              </Text>
+              {alerta.denuncia_id && (
+                <TouchableOpacity onPress={() => navigation.navigate('ReporteDetalle', { id: alerta.denuncia_id! })}>
+                  <Text style={[styles.sosVerCaso, { color: '#DC2626' }]}>Ver caso vinculado →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.sosCancelarBtn, { borderColor: '#FECACA' }]}
+              onPress={() => handleCancelarSos(alerta.id)}
+              disabled={sosCancelando === alerta.id}
+            >
+              {sosCancelando === alerta.id
+                ? <ActivityIndicator size="small" color="#DC2626" />
+                : <Text style={[styles.sosCancelarText, { color: '#DC2626' }]}>Cancelar</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+
+      {/* Acceso por código */}
+      <TouchableOpacity
+        style={[styles.codigoRow, { backgroundColor: colors.surface, borderColor: codigoExpanded ? colors.primary : colors.border }]}
+        onPress={() => { setCodigoExpanded((v) => !v); setCodigoError(''); }}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="key-outline" size={15} color={colors.primary} />
+        <Text style={[styles.codigoRowText, { color: colors.textSecondary }]}>
+          ¿Tienes un código de acceso?
+        </Text>
+        <Ionicons
+          name={codigoExpanded ? 'chevron-up' : 'chevron-down'}
+          size={14}
+          color={colors.textDisabled}
+          style={{ marginLeft: 'auto' }}
+        />
+      </TouchableOpacity>
+
+      {codigoExpanded && (
+        <View style={[styles.codigoPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.codigoPanelLabel, { color: colors.textSecondary }]}>
+            Ingresa el código que te dio el operador (ej: AB3F7K)
+          </Text>
+          <View style={styles.codigoInputRow}>
+            <TextInput
+              style={[
+                styles.codigoInput,
+                { backgroundColor: colors.background, borderColor: colors.border, color: colors.text },
+              ]}
+              value={codigoInput}
+              onChangeText={(t) => { setCodigoInput(t.toUpperCase()); setCodigoError(''); }}
+              placeholder="Código de acceso"
+              placeholderTextColor={colors.textDisabled}
+              autoCapitalize="characters"
+              maxLength={6}
+              returnKeyType="search"
+              onSubmitEditing={buscarPorCodigo}
+            />
+            <TouchableOpacity
+              style={[
+                styles.codigoBtnBuscar,
+                { backgroundColor: colors.primary, opacity: codigoInput.trim().length < 4 || codigoBuscando ? 0.5 : 1 },
+              ]}
+              onPress={buscarPorCodigo}
+              disabled={codigoInput.trim().length < 4 || codigoBuscando}
+            >
+              {codigoBuscando
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.codigoBtnText}>Buscar</Text>
+              }
+            </TouchableOpacity>
+          </View>
+          {!!codigoError && (
+            <Text style={[styles.codigoError, { color: colors.error ?? '#D32F2F' }]}>{codigoError}</Text>
+          )}
+        </View>
+      )}
 
       {/* Banner de datos locales cuando la API no está disponible */}
       {apiError && casosComoDenuncia.length > 0 && (
@@ -416,6 +559,80 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   anonimaText: { fontFamily: 'Inter-Regular', fontSize: 10 },
+
+  // SOS banner
+  sosBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  sosBannerLeft:  { flex: 1, gap: 3 },
+  sosIconRow:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sosEmoji:       { fontSize: 16 },
+  sosTitle:       { fontFamily: 'Montserrat-ExtraBold', fontSize: 13 },
+  sosSubtitle:    { fontFamily: 'Inter-Regular', fontSize: 12 },
+  sosVerCaso:     { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 2 },
+  sosCancelarBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sosCancelarText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 12 },
+
+  // Código de acceso
+  codigoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  codigoRowText: { fontFamily: 'Inter-Regular', fontSize: 13, flex: 1 },
+  codigoPanel: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  codigoPanelLabel: { fontFamily: 'Inter-Regular', fontSize: 12, lineHeight: 18 },
+  codigoInputRow: { flexDirection: 'row', gap: 8 },
+  codigoInput: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontFamily: 'Montserrat-ExtraBold',
+    fontSize: 16,
+    letterSpacing: 4,
+  },
+  codigoBtnBuscar: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  codigoBtnText: { fontFamily: 'Montserrat-ExtraBold', fontSize: 13, color: '#FFFFFF' },
+  codigoError: { fontFamily: 'Inter-Regular', fontSize: 12 },
 
   // Skeleton
   skeletonCard: { minHeight: 90 },

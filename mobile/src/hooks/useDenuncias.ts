@@ -23,6 +23,7 @@ export function useDenuncia(id: string) {
     queryKey: denunciasKeys.detalle(id),
     queryFn:  () => denunciasService.obtenerPorId(id),
     enabled:  !!id,
+    refetchInterval: 30_000,
   });
 }
 
@@ -39,7 +40,7 @@ export function useMensajesCaso(denunciaId: string) {
     queryKey: denunciasKeys.mensajes(denunciaId),
     queryFn:  () => denunciasService.obtenerMensajes(denunciaId),
     enabled:  !!denunciaId,
-    refetchInterval: 30_000, // polling cada 30s mientras el caso está abierto
+    refetchInterval: 10_000,
   });
 }
 

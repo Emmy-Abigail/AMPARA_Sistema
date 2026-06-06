@@ -91,6 +91,14 @@ export const denunciasService = {
     await api.patch(`/denuncias/mensajes/${mensajeId}/leer`);
   },
 
+  async buscarPorCodigo(codigo: string): Promise<{ id: string; estado: string; tipos_violencia: string[] }> {
+    const { data } = await api.get<ApiResponse<{ id: string; estado: string; tipos_violencia: string[] }>>(
+      '/denuncias/acceso-anonimo',
+      { params: { codigo: codigo.toUpperCase().trim() } },
+    );
+    return data.data;
+  },
+
   async responderMensaje(
     denunciaId: string,
     contenido: string,

@@ -98,6 +98,7 @@ class DenunciaResponse(BaseModel):
     descripcion:          str | None = None
     es_anonima:           bool
     estado:               EstadoCasoEnum
+    motivo_cierre:        str | None = None
     fecha_denuncia:       datetime
     fecha_actualizacion:  datetime
 
@@ -126,6 +127,7 @@ class DenunciaResponse(BaseModel):
             descripcion=obj.descripcion,
             es_anonima=obj.es_anonima,
             estado=obj.estado,
+            motivo_cierre=obj.motivo_cierre,
             fecha_denuncia=obj.fecha_denuncia,
             fecha_actualizacion=obj.fecha_actualizacion,
         )

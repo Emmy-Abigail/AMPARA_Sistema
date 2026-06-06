@@ -15,7 +15,11 @@ class SosResponse(BaseModel):
     id:               uuid.UUID
     estado:           str
     sms_enviados:     int
+    denuncia_id:      uuid.UUID | None = None
+    latitud:          float | None = None
+    longitud:         float | None = None
     fecha_activacion: datetime
+    fecha_resolucion: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

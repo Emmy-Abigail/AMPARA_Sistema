@@ -49,10 +49,16 @@ export const dashboardApi = {
     f: Partial<Filtros>,
     pagina = 1,
     porPagina = 30,
+    soloActivas = false,
   ) =>
     api
       .get<ApiResponse<PaginatedData<Denuncia>>>('/dashboard/denuncias', {
-        params: { ...toParams(f), pagina, porPagina },
+        params: {
+          ...toParams(f),
+          pagina,
+          porPagina,
+          ...(soloActivas ? { solo_activas: true } : {}),
+        },
       })
       .then((r) => r.data.data),
 

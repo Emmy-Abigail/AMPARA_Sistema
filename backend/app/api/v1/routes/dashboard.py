@@ -105,11 +105,13 @@ async def listar_denuncias(
     hay_heridos:    Optional[bool] = Query(None),
     fecha_desde:    Optional[date] = Query(None),
     fecha_hasta:    Optional[date] = Query(None),
+    solo_activas:   bool           = Query(False),
     db:             AsyncSession   = Depends(get_db),
     _:              Usuario        = Depends(_require_operador),
 ):
     q = select(Denuncia)
 
+    if solo_activas:   q = q.where(Denuncia.estado != "cerrada")
     if estado:         q = q.where(Denuncia.estado == estado)
     if nivel_riesgo:   q = q.where(Denuncia.nivel_riesgo == nivel_riesgo)
     if tipo_violencia: q = q.where(Denuncia.tipo_violencia == tipo_violencia)
@@ -144,6 +146,7 @@ async def mapa_denuncias(
             Denuncia.id, Denuncia.latitud, Denuncia.longitud,
             Denuncia.nivel_riesgo, Denuncia.tipo_violencia,
             Denuncia.hay_heridos, Denuncia.estado,
+            Denuncia.relacion_agresor, Denuncia.fecha_denuncia,
         ).where(
             Denuncia.latitud.isnot(None),
             Denuncia.longitud.isnot(None),
@@ -152,13 +155,15 @@ async def mapa_denuncias(
     rows = result.all()
     return ApiResponse(data=[
         {
-            "id":             str(r.id),
-            "lat":            r.latitud,
-            "lng":            r.longitud,
-            "nivel_riesgo":   r.nivel_riesgo,
-            "tipo_violencia": r.tipo_violencia,
-            "hay_heridos":    r.hay_heridos,
-            "estado":         r.estado,
+            "id":               str(r.id),
+            "lat":              r.latitud,
+            "lng":              r.longitud,
+            "nivel_riesgo":     r.nivel_riesgo,
+            "tipo_violencia":   r.tipo_violencia,
+            "hay_heridos":      r.hay_heridos,
+            "estado":           r.estado,
+            "relacion_agresor": r.relacion_agresor,
+            "fecha_denuncia":   r.fecha_denuncia.isoformat() if r.fecha_denuncia else None,
         }
         for r in rows
     ])

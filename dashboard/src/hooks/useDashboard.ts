@@ -48,10 +48,11 @@ export function useDenuncias(
   filtros: Partial<Filtros>,
   pagina = 1,
   porPagina = 30,
+  soloActivas = false,
 ) {
   return useQuery({
-    queryKey: keys.denuncias(filtros, pagina),
-    queryFn:  () => dashboardApi.denuncias(filtros, pagina, porPagina),
+    queryKey: [...keys.denuncias(filtros, pagina), soloActivas],
+    queryFn:  () => dashboardApi.denuncias(filtros, pagina, porPagina, soloActivas),
     refetchInterval: POLL_NORMAL,
   });
 }
@@ -124,8 +125,8 @@ export function useMensajes(denunciaId: string, enabled = true) {
     queryKey: keys.mensajes(denunciaId),
     queryFn:  () => dashboardApi.getMensajes(denunciaId),
     enabled,
-    refetchInterval: 20_000,
-    staleTime: 10_000,
+    refetchInterval: 10_000,
+    staleTime: 5_000,
   });
 }
 

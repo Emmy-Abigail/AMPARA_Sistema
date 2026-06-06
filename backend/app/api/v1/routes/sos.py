@@ -2,9 +2,11 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.core.security import get_current_user, get_optional_user
@@ -59,6 +61,37 @@ async def activar_sos(
         data=SosResponse.model_validate(alerta),
         mensaje="Alerta SOS activada",
     )
+
+
+@router.get("/mis-alertas", response_model=ApiResponse[list[SosResponse]])
+async def mis_alertas_sos(
+    authorization: Optional[str] = Header(default=None),
+    x_device_id:   Optional[str] = Header(default=None, alias="X-Device-Id"),
+    db: AsyncSession = Depends(get_db),
+):
+    usuario = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+        try:
+            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            if payload.get("type") == "access":
+                email = payload.get("sub")
+                if email:
+                    result = await db.execute(select(Usuario).where(Usuario.email == email))
+                    usuario = result.scalar_one_or_none()
+        except (JWTError, Exception):
+            pass
+
+    if usuario:
+        q = select(AlertaSos).where(AlertaSos.usuario_id == usuario.id)
+    elif x_device_id:
+        q = select(AlertaSos).where(AlertaSos.device_id == x_device_id)
+    else:
+        return ApiResponse(data=[])
+
+    result = await db.execute(q.order_by(AlertaSos.fecha_activacion.desc()).limit(10))
+    alertas = result.scalars().all()
+    return ApiResponse(data=[SosResponse.model_validate(a) for a in alertas])
 
 
 @router.patch("/{alerta_id}/resolver", status_code=status.HTTP_204_NO_CONTENT)

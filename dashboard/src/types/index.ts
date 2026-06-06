@@ -61,6 +61,7 @@ export interface Denuncia {
   horario_contacto: string | null;
   es_anonima: boolean;
   estado: EstadoCaso;
+  motivo_cierre?: string | null;
   fecha_denuncia: string;
   fecha_actualizacion: string;
 }
@@ -75,6 +76,8 @@ export interface DenunciaMapa {
   tipo_violencia: TipoViolencia;
   hay_heridos: boolean;
   estado: EstadoCaso;
+  relacion_agresor?: string;
+  fecha_denuncia?: string;
 }
 
 // ─── Alerta SOS ───────────────────────────────────────────────────────────────

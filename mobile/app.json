@@ -4,11 +4,11 @@
     "slug": "ampara",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ampara-logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/ampara-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#6E2DB0"
     },
@@ -41,7 +41,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#6E2DB0",
-          "image": "./assets/icon.png",
+          "image": "./assets/ampara-logo.png",
           "imageWidth": 200
         }
       ],
@@ -57,8 +57,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "dfbe6e5b-1224-4b44-9824-b074a07a3938"
       }
-    }
+    },
+    "owner": "emmy_lopez"
   }
 }

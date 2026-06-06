@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
+from app.models.alerta_sos import AlertaSos
 from app.models.denuncia import Denuncia
 from app.models.mensaje_caso import MensajeCaso
 from app.models.usuario import Usuario
@@ -335,3 +336,47 @@ async def toggle_personal_estado(
     user.es_activo = not user.es_activo
     await db.flush()
     return ApiResponse(data={"id": str(user.id), "esActivo": user.es_activo})
+
+
+# ─── Alertas SOS activas ──────────────────────────────────────────────────────
+
+@router.get("/sos", response_model=ApiResponse[list[dict]])
+async def listar_sos_activas(
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(_require_operador),
+):
+    result = await db.execute(
+        select(AlertaSos, Usuario.nombre)
+        .outerjoin(Usuario, AlertaSos.usuario_id == Usuario.id)
+        .where(AlertaSos.estado == "activa")
+        .order_by(AlertaSos.fecha_activacion.desc())
+        .limit(20)
+    )
+    rows = result.all()
+    return ApiResponse(data=[
+        {
+            "id":               str(alerta.id),
+            "usuario_nombre":   nombre,
+            "latitud":          alerta.latitud,
+            "longitud":         alerta.longitud,
+            "sms_enviados":     alerta.sms_enviados,
+            "fecha_activacion": alerta.fecha_activacion.isoformat(),
+            "denuncia_id":      str(alerta.denuncia_id) if alerta.denuncia_id else None,
+        }
+        for alerta, nombre in rows
+    ])
+
+
+@router.patch("/sos/{alerta_id}/resolver", status_code=status.HTTP_204_NO_CONTENT)
+async def resolver_sos_dashboard(
+    alerta_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(_require_operador),
+):
+    result = await db.execute(select(AlertaSos).where(AlertaSos.id == alerta_id))
+    alerta = result.scalar_one_or_none()
+    if not alerta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
+    alerta.estado = "resuelta"
+    alerta.fecha_resolucion = datetime.now(timezone.utc)
+    await db.flush()

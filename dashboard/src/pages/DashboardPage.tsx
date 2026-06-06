@@ -6,6 +6,7 @@ import { KpiCards } from '../components/KpiCards';
 import { MapaVigilancia } from '../components/MapaVigilancia';
 import { FeedAcciones } from '../components/FeedAcciones';
 import { TendenciasChart } from '../components/TendenciasChart';
+import { SOSBanner } from '../components/SOSBanner';
 import { PersonalPage } from './PersonalPage';
 import type { Filtros } from '../types';
 
@@ -39,6 +40,7 @@ export function DashboardPage() {
                 title="Panel de Operaciones"
                 subtitle={subtitle}
               />
+              <SOSBanner />
               <FiltrosBar filtros={filtros} onChange={setFiltros} />
               <KpiCards filtros={filtros} />
               <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 mb-4">

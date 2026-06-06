@@ -8,6 +8,7 @@ import type {
   DenunciaMapa,
   MensajeResponse,
   Operador,
+  AlertaSos,
   Filtros,
   EstadoCaso,
 } from '../types';
@@ -86,6 +87,15 @@ export const dashboardApi = {
     api
       .get<ApiResponse<MensajeResponse[]>>(`/denuncias/${denunciaId}/mensajes`)
       .then((r) => r.data.data),
+
+  // ─── SOS ──────────────────────────────────────────────────────────────────
+  sosActivas: () =>
+    api
+      .get<ApiResponse<AlertaSos[]>>('/dashboard/sos')
+      .then((r) => r.data.data),
+
+  resolverSos: (id: string) =>
+    api.patch(`/dashboard/sos/${id}/resolver`),
 
   // POST /dashboard/denuncias/:id/mensajes
   sendMensaje: (denunciaId: string, contenido: string, destruirAlLeer: boolean) =>

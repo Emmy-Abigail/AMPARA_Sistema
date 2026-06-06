@@ -77,6 +77,18 @@ export interface DenunciaMapa {
   estado: EstadoCaso;
 }
 
+// ─── Alerta SOS ───────────────────────────────────────────────────────────────
+
+export interface AlertaSos {
+  id: string;
+  usuario_nombre: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  sms_enviados: number;
+  fecha_activacion: string;
+  denuncia_id: string | null;
+}
+
 // ─── Operadores ───────────────────────────────────────────────────────────────
 
 export interface Operador {

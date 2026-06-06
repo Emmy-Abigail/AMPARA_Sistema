@@ -4,6 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dashboardApi } from '../api/endpoints';
 import type { EstadoCaso, Filtros } from '../types';
 
+// ─── Intervalos de polling ────────────────────────────────────────────────────
+const POLL_SLOW   = 60_000; // KPIs y mapa: 1 min
+const POLL_NORMAL = 15_000; // Expedientes: 15 s
+const POLL_SOS    = 10_000; // SOS: 10 s — alerta de emergencia
+
 // ─── Query keys ───────────────────────────────────────────────────────────────
 
 const keys = {
@@ -13,9 +18,8 @@ const keys = {
                                         ['denuncias', f, pagina]  as const,
   operadores:  ()                    => ['operadores']             as const,
   mensajes:    (id: string)          => ['mensajes', id]           as const,
+  sos:         ()                    => ['sos']                    as const,
 };
-
-const REFETCH_INTERVAL = 60_000; // 1 min
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
 
@@ -23,7 +27,7 @@ export function useKpis(filtros: Partial<Filtros>) {
   return useQuery({
     queryKey: keys.kpis(filtros),
     queryFn:  () => dashboardApi.kpis(filtros),
-    refetchInterval: REFETCH_INTERVAL,
+    refetchInterval: POLL_SLOW,
   });
 }
 
@@ -34,7 +38,7 @@ export function useMapaDenuncias() {
     queryKey: keys.mapa(),
     queryFn:  dashboardApi.mapaDenuncias,
     staleTime: 30_000,
-    refetchInterval: REFETCH_INTERVAL,
+    refetchInterval: POLL_SLOW,
   });
 }
 
@@ -48,7 +52,26 @@ export function useDenuncias(
   return useQuery({
     queryKey: keys.denuncias(filtros, pagina),
     queryFn:  () => dashboardApi.denuncias(filtros, pagina, porPagina),
-    refetchInterval: REFETCH_INTERVAL,
+    refetchInterval: POLL_NORMAL,
+  });
+}
+
+// ─── Alertas SOS ──────────────────────────────────────────────────────────────
+
+export function useSosAlertas() {
+  return useQuery({
+    queryKey: keys.sos(),
+    queryFn:  dashboardApi.sosActivas,
+    refetchInterval: POLL_SOS,
+    staleTime: 5_000,
+  });
+}
+
+export function useResolverSos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => dashboardApi.resolverSos(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sos'] }),
   });
 }
 

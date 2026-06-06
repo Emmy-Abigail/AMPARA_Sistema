@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../store/auth-context';
 import type { AuthStackParamList } from '../types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
@@ -15,6 +16,14 @@ const LOGO = require('../../assets/ampara-logo.png');
 export default function WelcomeScreen({ navigation }: Props) {
   const insets        = useSafeAreaInsets();
   const { loginAsGuest } = useAuth();
+  const { pendingAuthScreen, setPendingAuthScreen } = useAuthContext();
+
+  React.useLayoutEffect(() => {
+    if (pendingAuthScreen === 'Register') {
+      setPendingAuthScreen(null);
+      navigation.navigate('Register');
+    }
+  }, []);
 
   return (
     <LinearGradient

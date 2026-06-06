@@ -72,7 +72,11 @@ export function useResolverSos() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => dashboardApi.resolverSos(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sos'] });
+      qc.invalidateQueries({ queryKey: ['denuncias'] });
+      qc.invalidateQueries({ queryKey: ['kpis'] });
+    },
   });
 }
 

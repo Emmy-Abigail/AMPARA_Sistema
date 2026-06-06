@@ -179,5 +179,15 @@ async def resolver_sos(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
     alerta.estado = "cancelada"
+
+    # Si la denuncia vinculada sigue sin atender, cerrarla automáticamente
+    if alerta.denuncia_id:
+        den_result = await db.execute(
+            select(Denuncia).where(Denuncia.id == alerta.denuncia_id)
+        )
+        denuncia = den_result.scalar_one_or_none()
+        if denuncia and denuncia.estado == "nueva":
+            denuncia.estado = "cerrada"
+
     await db.flush()
     return None

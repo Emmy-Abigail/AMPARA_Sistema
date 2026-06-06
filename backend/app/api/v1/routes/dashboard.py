@@ -409,4 +409,14 @@ async def resolver_sos_dashboard(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
     alerta.estado = "resuelta"
     alerta.fecha_resolucion = datetime.now(timezone.utc)
+
+    # Si la denuncia vinculada sigue sin atender, cerrarla
+    if alerta.denuncia_id:
+        den_result = await db.execute(
+            select(Denuncia).where(Denuncia.id == alerta.denuncia_id)
+        )
+        denuncia = den_result.scalar_one_or_none()
+        if denuncia and denuncia.estado == "nueva":
+            denuncia.estado = "cerrada"
+
     await db.flush()

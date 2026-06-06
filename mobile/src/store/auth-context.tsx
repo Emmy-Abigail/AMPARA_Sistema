@@ -14,6 +14,8 @@ interface AuthContextValue {
   setUsuario: (u: Usuario | null) => void;
   splashShown: boolean;
   setSplashShown: (value: boolean) => void;
+  pendingAuthScreen: 'Register' | null;
+  setPendingAuthScreen: (screen: 'Register' | null) => void;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -23,6 +25,8 @@ const AuthContext = createContext<AuthContextValue>({
   setUsuario: () => {},
   splashShown: false,
   setSplashShown: () => {},
+  pendingAuthScreen: null,
+  setPendingAuthScreen: () => {},
 });
 
 /**
@@ -53,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [splashShown, setSplashShown] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pendingAuthScreen, setPendingAuthScreen] = useState<'Register' | null>(null);
 
   const setAuthRef = useRef(setIsAuthenticated);
   setAuthRef.current = setIsAuthenticated;
@@ -119,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, setIsAuthenticated, usuario, setUsuario, splashShown, setSplashShown }}
+      value={{ isAuthenticated, setIsAuthenticated, usuario, setUsuario, splashShown, setSplashShown, pendingAuthScreen, setPendingAuthScreen }}
     >
       {children}
     </AuthContext.Provider>

@@ -21,6 +21,7 @@ import * as Location from 'expo-location';
 
 import { useTheme } from '../theme';
 import { useAuth } from '../hooks/useAuth';
+import { useAuthContext } from '../store/auth-context';
 import { storage, StorageKeys } from '../store/storage';
 import { api } from '../services/api';
 import { ICONOS, aplicarIcono, type IconoId, type IconoOpcion } from '../services/iconCamouflage';
@@ -383,6 +384,7 @@ function CirculoConfianza({
 export default function PerfilScreen({ navigation }: Props) {
   const { colors, mode, setThemeMode } = useTheme();
   const { usuario, logout } = useAuth();
+  const { setPendingAuthScreen } = useAuthContext();
   const insets = useSafeAreaInsets();
 
   const [notifCasos,      setNotifCasos]      = useState(true);
@@ -778,6 +780,26 @@ export default function PerfilScreen({ navigation }: Props) {
                 </Text>
               </View>
             </View>
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+            <SettingRow
+              icono="person-add-outline"
+              label="Crear cuenta"
+              descripcion="Guarda tus casos y accede desde cualquier dispositivo"
+              colors={colors}
+              onPress={() => {
+                setPendingAuthScreen('Register');
+                logout();
+              }}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+            <SettingRow
+              icono="log-out-outline"
+              label="Salir a la pantalla inicial"
+              descripcion="Volver al inicio sin borrar tus datos locales"
+              colors={colors}
+              peligroso
+              onPress={handleCerrarSesion}
+            />
             <View style={[styles.divider, { backgroundColor: colors.divider }]} />
           </>
         )}

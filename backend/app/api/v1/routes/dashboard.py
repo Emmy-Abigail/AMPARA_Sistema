@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, hash_password
-from app.models.denuncia import Denuncia, _calcular_nivel_riesgo
+from app.models.denuncia import Denuncia
 from app.models.mensaje_caso import MensajeCaso
 from app.models.usuario import Usuario
 from app.schemas.denuncia import DenunciaAsignarUpdate, DenunciaEstadoUpdate, DenunciaResponse

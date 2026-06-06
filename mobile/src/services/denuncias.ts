@@ -66,7 +66,10 @@ export const denunciasService = {
   },
 
   async obtenerPorId(id: string): Promise<Denuncia> {
-    const { data } = await api.get<ApiResponse<Denuncia>>(`/denuncias/${id}`);
+    const deviceId = await storage.getItem(StorageKeys.DEVICE_ID);
+    const { data } = await api.get<ApiResponse<Denuncia>>(`/denuncias/${id}`, {
+      headers: deviceId ? { 'X-Device-Id': deviceId } : {},
+    });
     return data.data;
   },
 
@@ -76,8 +79,10 @@ export const denunciasService = {
   },
 
   async obtenerMensajes(denunciaId: string): Promise<MensajeCaso[]> {
+    const deviceId = await storage.getItem(StorageKeys.DEVICE_ID);
     const { data } = await api.get<ApiResponse<MensajeCaso[]>>(
       `/denuncias/${denunciaId}/mensajes`,
+      { headers: deviceId ? { 'X-Device-Id': deviceId } : {} },
     );
     return data.data;
   },

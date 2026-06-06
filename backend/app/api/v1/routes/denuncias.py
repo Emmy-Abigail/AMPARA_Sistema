@@ -259,6 +259,7 @@ async def get_por_token(token_anonimo: str, db: AsyncSession = Depends(get_db)):
 async def get_denuncia(
     denuncia_id: uuid.UUID,
     authorization: Optional[str] = Header(default=None),
+    x_device_id: Optional[str]   = Header(default=None, alias="X-Device-Id"),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Denuncia).where(Denuncia.id == denuncia_id))
@@ -266,10 +267,11 @@ async def get_denuncia(
     if not denuncia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
 
-    usuario        = await _resolve_optional_user(authorization, db)
-    es_propietario = usuario and denuncia.usuario_id == usuario.id
-    es_staff       = usuario and usuario.rol in ("operador", "admin")
-    if not es_propietario and not es_staff:
+    usuario              = await _resolve_optional_user(authorization, db)
+    es_propietario       = usuario is not None and denuncia.usuario_id == usuario.id
+    es_mismo_dispositivo = x_device_id is not None and denuncia.device_id == x_device_id
+    es_staff             = usuario is not None and usuario.rol in ("operador", "admin")
+    if not es_propietario and not es_mismo_dispositivo and not es_staff:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta denuncia")
 
     return ApiResponse(data=DenunciaResponse.from_orm_extended(denuncia))
@@ -281,6 +283,7 @@ async def get_denuncia(
 async def get_mensajes(
     denuncia_id: uuid.UUID,
     authorization: Optional[str] = Header(default=None),
+    x_device_id: Optional[str]   = Header(default=None, alias="X-Device-Id"),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(Denuncia).where(Denuncia.id == denuncia_id))
@@ -288,10 +291,11 @@ async def get_mensajes(
     if not denuncia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Denuncia no encontrada")
 
-    usuario        = await _resolve_optional_user(authorization, db)
-    es_propietario = usuario and denuncia.usuario_id == usuario.id
-    es_staff       = usuario and usuario.rol in ("operador", "admin")
-    if not es_propietario and not es_staff:
+    usuario              = await _resolve_optional_user(authorization, db)
+    es_propietario       = usuario is not None and denuncia.usuario_id == usuario.id
+    es_mismo_dispositivo = x_device_id is not None and denuncia.device_id == x_device_id
+    es_staff             = usuario is not None and usuario.rol in ("operador", "admin")
+    if not es_propietario and not es_mismo_dispositivo and not es_staff:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso")
 
     result = await db.execute(

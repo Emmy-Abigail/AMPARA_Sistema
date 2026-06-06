@@ -1,4 +1,4 @@
-// app - schemas - responses.py
+# app - schemas - responses.py
 
 from typing import Generic, TypeVar
 

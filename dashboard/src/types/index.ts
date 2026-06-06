@@ -84,12 +84,14 @@ export interface DenunciaMapa {
 
 export interface AlertaSos {
   id: string;
+  estado: string;             // activa | en_atencion | resuelta
   usuario_nombre: string | null;
   latitud: number | null;
   longitud: number | null;
   sms_enviados: number;
   fecha_activacion: string;
   denuncia_id: string | null;
+  codigo_acceso?: string | null;
 }
 
 // ─── Operadores ───────────────────────────────────────────────────────────────

@@ -56,6 +56,7 @@ export function DashboardPage() {
                     filtros={filtros}
                     selectedId={selectedDenunciaId}
                     onClearSelected={() => setSelectedDenunciaId(null)}
+                    onSelectDenuncia={setSelectedDenunciaId}
                   />
                 </div>
               </div>

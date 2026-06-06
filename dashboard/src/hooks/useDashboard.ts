@@ -76,6 +76,14 @@ export function useResolverSos() {
   });
 }
 
+export function useMarcarSosEnAtencion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => dashboardApi.sosEnAtencion(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sos'] }),
+  });
+}
+
 // ─── Operadores ───────────────────────────────────────────────────────────────
 
 export function useOperadores() {

@@ -12,6 +12,7 @@ import 'leaflet/dist/leaflet.css';
 import {
   useDenuncias, useCambiarEstado, useAsignarOperador,
   useOperadores, useSendMensaje, useMensajes, useSosAlertas, useKpis,
+  useResolverSos, useMarcarSosEnAtencion,
 } from '../hooks/useDashboard';
 import type { Filtros, Denuncia, EstadoCaso, NivelRiesgo, Operador, AlertaSos } from '../types';
 import { Badge } from './ui/Badge';
@@ -760,17 +761,150 @@ function ExpedienteCard({
   );
 }
 
+// ─── Tarjeta SOS ──────────────────────────────────────────────────────────────
+
+function SosCard({
+  alerta,
+  onSelectDenuncia,
+}: {
+  alerta: AlertaSos;
+  onSelectDenuncia?: (id: string) => void;
+}) {
+  const { mutate: enAtencion, isPending: marcando }  = useMarcarSosEnAtencion();
+  const { mutate: resolver,   isPending: resolviendo } = useResolverSos();
+
+  const hace = (() => {
+    const diff = Date.now() - new Date(alerta.fecha_activacion).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'hace un momento';
+    if (mins < 60) return `hace ${mins} min`;
+    return `hace ${Math.floor(mins / 60)} h`;
+  })();
+
+  const enAtencionActual = alerta.estado === 'en_atencion';
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden ${
+      enAtencionActual
+        ? 'border-orange-300 bg-orange-50/30'
+        : 'border-red-400 bg-red-50/20'
+    }`}>
+
+      {/* Cabecera */}
+      <div className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold ${
+        enAtencionActual ? 'bg-orange-500 text-white' : 'bg-red-600 text-white'
+      }`}>
+        <span className="relative flex-shrink-0">
+          {!enAtencionActual && (
+            <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-white opacity-40" />
+          )}
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-white/80" />
+        </span>
+        🆘 ALERTA SOS
+        <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+          enAtencionActual
+            ? 'bg-orange-400/40 text-white'
+            : 'bg-red-500/40 text-red-100'
+        }`}>
+          {enAtencionActual ? 'En atención' : 'Activa'}
+        </span>
+      </div>
+
+      {/* Cuerpo */}
+      <div className="px-3.5 py-3 space-y-3">
+
+        {/* Nombre + tiempo */}
+        <div>
+          <p className="text-sm font-bold text-[#1A0A2E]">
+            {alerta.usuario_nombre ?? 'Usuaria anónima'}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {hace}
+            {alerta.sms_enviados > 0 && (
+              <span className="ml-2">· 📨 {alerta.sms_enviados} SMS al círculo</span>
+            )}
+          </p>
+        </div>
+
+        {/* Ubicación */}
+        {alerta.latitud && alerta.longitud && (
+          <a
+            href={`https://maps.google.com/?q=${alerta.latitud},${alerta.longitud}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-xs text-red-600 font-semibold hover:text-red-800 transition-colors"
+          >
+            <MapPin size={12} />
+            Ver ubicación en Google Maps
+          </a>
+        )}
+
+        {/* Expediente vinculado */}
+        {alerta.denuncia_id && (
+          <div className="flex items-center gap-2 bg-white rounded-xl border border-[#EBE3F9] px-3 py-2">
+            <span className="text-[10px] text-[#B09CC8] font-bold uppercase tracking-wider">Expediente</span>
+            {alerta.codigo_acceso && (
+              <span className="text-xs font-mono font-black text-[#8B43D4]">{alerta.codigo_acceso}</span>
+            )}
+            {onSelectDenuncia && (
+              <button
+                onClick={() => onSelectDenuncia(alerta.denuncia_id!)}
+                className="ml-auto text-[11px] font-bold text-[#8B43D4] hover:text-[#6E2DB0] transition-colors"
+              >
+                Ver expediente →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Acciones */}
+        <div className="flex gap-2 pt-1">
+          {!enAtencionActual && (
+            <button
+              disabled={marcando}
+              onClick={() => enAtencion(alerta.id)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all disabled:opacity-50"
+            >
+              {marcando
+                ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <Clock size={12} />
+              }
+              En atención
+            </button>
+          )}
+          <button
+            disabled={resolviendo}
+            onClick={() => resolver(alerta.id)}
+            className={`flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl transition-all disabled:opacity-50 ${
+              enAtencionActual
+                ? 'flex-1 bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-white border border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600'
+            }`}
+          >
+            {resolviendo
+              ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : <CheckCircle size={12} />
+            }
+            Resolver
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── FeedAcciones principal ────────────────────────────────────────────────────
 
-type Tab = 'activas' | 'sin_asignar' | 'cerradas';
+type Tab = 'activas' | 'sin_asignar' | 'cerradas' | 'sos';
 
 interface Props {
   filtros: Partial<Filtros>;
   selectedId?: string | null;
   onClearSelected?: () => void;
+  onSelectDenuncia?: (id: string) => void;
 }
 
-export function FeedAcciones({ filtros, selectedId, onClearSelected }: Props) {
+export function FeedAcciones({ filtros, selectedId, onClearSelected, onSelectDenuncia }: Props) {
   const [pagina, setPagina]       = useState(1);
   const [tabActiva, setTabActiva] = useState<Tab>('activas');
 
@@ -824,6 +958,7 @@ export function FeedAcciones({ filtros, selectedId, onClearSelected }: Props) {
   const sinAsignarCnt = por_estado?.nueva ?? 0;
   const cerradasCnt   = por_estado?.cerrada ?? 0;
   const urgentesCnt   = kpis?.urgentes ?? 0;
+  const sosCnt        = sosAlertas.filter((s) => s.estado === 'activa' || s.estado === 'en_atencion').length;
 
   return (
     <div className="bg-white rounded-2xl border border-[#DDD0F5] shadow-sm p-5 flex flex-col h-full">
@@ -861,33 +996,45 @@ export function FeedAcciones({ filtros, selectedId, onClearSelected }: Props) {
       {/* ── Tabs de organización ─────────────────────────────────────────── */}
       <div className="flex gap-1 mb-3 bg-gray-50 rounded-xl p-1">
         {([
-          { id: 'activas'     as Tab, label: 'Activas',     count: activasCnt,    showUrgent: urgentesCnt > 0 },
-          { id: 'sin_asignar' as Tab, label: 'Sin asignar', count: sinAsignarCnt, showUrgent: false },
-          { id: 'cerradas'    as Tab, label: 'Cerradas',    count: cerradasCnt,   showUrgent: false },
-        ] as const).map(({ id, label, count, showUrgent }) => (
-          <button
-            key={id}
-            onClick={() => setTabActiva(id)}
-            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all ${
-              tabActiva === id
-                ? 'bg-white text-[#8B43D4] shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {label}
-            {count > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+          { id: 'activas'     as Tab, label: 'Activas',     count: activasCnt,    showUrgent: urgentesCnt > 0, showSos: false },
+          { id: 'sin_asignar' as Tab, label: 'Sin asignar', count: sinAsignarCnt, showUrgent: false,           showSos: false },
+          { id: 'sos'         as Tab, label: '🆘 SOS',      count: sosCnt,        showUrgent: sosCnt > 0,      showSos: true  },
+          { id: 'cerradas'    as Tab, label: 'Cerradas',    count: cerradasCnt,   showUrgent: false,           showSos: false },
+        ] as const).map(({ id, label, count, showUrgent, showSos }) => {
+          if (id === 'sos' && sosCnt === 0) return null; // ocultar tab SOS si no hay alertas
+          return (
+            <button
+              key={id}
+              onClick={() => setTabActiva(id)}
+              className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold px-2 py-1.5 rounded-lg transition-all ${
                 tabActiva === id
-                  ? showUrgent
-                    ? 'bg-red-100 text-red-600 animate-pulse'
-                    : 'bg-[#F3EFFE] text-[#8B43D4]'
-                  : 'bg-gray-200 text-gray-500'
-              }`}>
-                {count}
-              </span>
-            )}
-          </button>
-        ))}
+                  ? showSos
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'bg-white text-[#8B43D4] shadow-sm'
+                  : showSos
+                    ? 'text-red-600 hover:bg-red-50'
+                    : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  tabActiva === id
+                    ? showSos
+                      ? 'bg-white/30 text-white'
+                      : showUrgent
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-[#F3EFFE] text-[#8B43D4]'
+                    : showSos
+                      ? 'bg-red-100 text-red-600 animate-pulse'
+                      : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {selectedId && (
@@ -904,7 +1051,24 @@ export function FeedAcciones({ filtros, selectedId, onClearSelected }: Props) {
       )}
 
       <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 max-h-[520px] pr-0.5">
-        {isLoading ? (
+        {tabActiva === 'sos' ? (
+          sosAlertas.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-[#B09CC8]">
+              <CheckCircle size={28} className="mb-2 text-[#DDD0F5]" />
+              <p className="text-sm">Sin alertas SOS activas</p>
+            </div>
+          ) : (
+            sosAlertas
+              .filter((s) => s.estado === 'activa' || s.estado === 'en_atencion')
+              .map((alerta) => (
+                <SosCard
+                  key={alerta.id}
+                  alerta={alerta}
+                  onSelectDenuncia={onSelectDenuncia}
+                />
+              ))
+          )
+        ) : isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-20 bg-[#F3EFFE] rounded-2xl animate-pulse" />
           ))

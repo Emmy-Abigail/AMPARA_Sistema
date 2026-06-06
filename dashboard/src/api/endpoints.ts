@@ -103,6 +103,9 @@ export const dashboardApi = {
   resolverSos: (id: string) =>
     api.patch(`/dashboard/sos/${id}/resolver`),
 
+  sosEnAtencion: (id: string) =>
+    api.patch(`/dashboard/sos/${id}/en-atencion`),
+
   // POST /dashboard/denuncias/:id/mensajes
   sendMensaje: (denunciaId: string, contenido: string, destruirAlLeer: boolean) =>
     api

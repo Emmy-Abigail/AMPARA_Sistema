@@ -351,9 +351,10 @@ async def listar_sos_activas(
     _: Usuario = Depends(_require_operador),
 ):
     result = await db.execute(
-        select(AlertaSos, Usuario.nombre)
-        .outerjoin(Usuario, AlertaSos.usuario_id == Usuario.id)
-        .where(AlertaSos.estado == "activa")
+        select(AlertaSos, Usuario.nombre, Denuncia.codigo_acceso)
+        .outerjoin(Usuario,   AlertaSos.usuario_id  == Usuario.id)
+        .outerjoin(Denuncia,  AlertaSos.denuncia_id == Denuncia.id)
+        .where(AlertaSos.estado.in_(["activa", "en_atencion"]))
         .order_by(AlertaSos.fecha_activacion.desc())
         .limit(20)
     )
@@ -361,15 +362,33 @@ async def listar_sos_activas(
     return ApiResponse(data=[
         {
             "id":               str(alerta.id),
+            "estado":           alerta.estado,
             "usuario_nombre":   nombre,
             "latitud":          alerta.latitud,
             "longitud":         alerta.longitud,
             "sms_enviados":     alerta.sms_enviados,
             "fecha_activacion": alerta.fecha_activacion.isoformat(),
             "denuncia_id":      str(alerta.denuncia_id) if alerta.denuncia_id else None,
+            "codigo_acceso":    codigo_acceso,
         }
-        for alerta, nombre in rows
+        for alerta, nombre, codigo_acceso in rows
     ])
+
+
+@router.patch("/sos/{alerta_id}/en-atencion", status_code=status.HTTP_204_NO_CONTENT)
+async def marcar_sos_en_atencion(
+    alerta_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _: Usuario = Depends(_require_operador),
+):
+    result = await db.execute(select(AlertaSos).where(AlertaSos.id == alerta_id))
+    alerta = result.scalar_one_or_none()
+    if not alerta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alerta no encontrada")
+    if alerta.estado != "activa":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La alerta no está activa")
+    alerta.estado = "en_atencion"
+    await db.flush()
 
 
 @router.patch("/sos/{alerta_id}/resolver", status_code=status.HTTP_204_NO_CONTENT)

@@ -168,21 +168,27 @@ export default function MyReportsScreen({ navigation }: Props) {
   const [sosAlertas, setSosAlertas]       = useState<SosAlertaResponse[]>([]);
   const [sosCancelando, setSosCancelando] = useState<string | null>(null);
 
-  useEffect(() => {
+  const cargarSos = useCallback(() => {
     listarMisAlertas().then(setSosAlertas).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    cargarSos();
+    const intervalo = setInterval(cargarSos, 30_000);
+    return () => clearInterval(intervalo);
+  }, [cargarSos]);
 
   const handleCancelarSos = async (id: string) => {
     setSosCancelando(id);
     try {
       await cancelarSosAlerta(id);
-      setSosAlertas((prev) => prev.filter((a) => a.id !== id));
+      setSosAlertas((prev) => prev.map((a) => a.id === id ? { ...a, estado: 'cancelada' } : a));
     } finally {
       setSosCancelando(null);
     }
   };
 
-  const sosActivas = sosAlertas.filter((a) => a.estado === 'activa');
+  const sosActivas = sosAlertas.filter((a) => a.estado === 'activa' || a.estado === 'en_atencion');
 
   // ── Acceso por código ────────────────────────────────────────────────────
   const [codigoExpanded, setCodigoExpanded] = useState(false);
@@ -310,33 +316,50 @@ export default function MyReportsScreen({ navigation }: Props) {
           if (mins < 60) return `hace ${mins} min`;
           return `hace ${Math.floor(mins / 60)} h`;
         })();
+        const enAtencion = alerta.estado === 'en_atencion';
+        const bannerColor   = enAtencion ? '#FFF7ED' : '#FEF2F2';
+        const borderColor   = enAtencion ? '#FED7AA' : '#FECACA';
+        const accentColor   = enAtencion ? '#EA580C' : '#DC2626';
+        const estadoLabel   = enAtencion ? '🟠 En atención' : '🔴 Activa';
         return (
-          <View key={alerta.id} style={[styles.sosBanner, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+          <View key={alerta.id} style={[styles.sosBanner, { backgroundColor: bannerColor, borderColor }]}>
             <View style={styles.sosBannerLeft}>
               <View style={styles.sosIconRow}>
                 <Text style={styles.sosEmoji}>🆘</Text>
-                <Text style={[styles.sosTitle, { color: '#DC2626' }]}>Alerta SOS activa</Text>
+                <Text style={[styles.sosTitle, { color: accentColor }]}>Alerta SOS</Text>
+                <View style={[styles.sosEstadoBadge, { backgroundColor: accentColor + '20' }]}>
+                  <Text style={[styles.sosEstadoText, { color: accentColor }]}>{estadoLabel}</Text>
+                </View>
               </View>
               <Text style={[styles.sosSubtitle, { color: '#6B7280' }]}>
                 {hace}
                 {alerta.sms_enviados > 0 ? ` · ${alerta.sms_enviados} SMS enviado${alerta.sms_enviados > 1 ? 's' : ''}` : ''}
               </Text>
+              {enAtencion && (
+                <Text style={[styles.sosAtencionMsg, { color: accentColor }]}>
+                  Un operador está atendiendo tu alerta
+                </Text>
+              )}
               {alerta.denuncia_id && (
                 <TouchableOpacity onPress={() => navigation.navigate('ReporteDetalle', { id: alerta.denuncia_id! })}>
-                  <Text style={[styles.sosVerCaso, { color: '#DC2626' }]}>Ver caso vinculado →</Text>
+                  <Text style={[styles.sosVerCaso, { color: accentColor }]}>
+                    Ver caso y mensajes del operador →
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
-            <TouchableOpacity
-              style={[styles.sosCancelarBtn, { borderColor: '#FECACA' }]}
-              onPress={() => handleCancelarSos(alerta.id)}
-              disabled={sosCancelando === alerta.id}
-            >
-              {sosCancelando === alerta.id
-                ? <ActivityIndicator size="small" color="#DC2626" />
-                : <Text style={[styles.sosCancelarText, { color: '#DC2626' }]}>Cancelar</Text>
-              }
-            </TouchableOpacity>
+            {alerta.estado === 'activa' && (
+              <TouchableOpacity
+                style={[styles.sosCancelarBtn, { borderColor }]}
+                onPress={() => handleCancelarSos(alerta.id)}
+                disabled={sosCancelando === alerta.id}
+              >
+                {sosCancelando === alerta.id
+                  ? <ActivityIndicator size="small" color={accentColor} />
+                  : <Text style={[styles.sosCancelarText, { color: accentColor }]}>Cancelar</Text>
+                }
+              </TouchableOpacity>
+            )}
           </View>
         );
       })}
@@ -578,6 +601,14 @@ const styles = StyleSheet.create({
   sosTitle:       { fontFamily: 'Montserrat-ExtraBold', fontSize: 13 },
   sosSubtitle:    { fontFamily: 'Inter-Regular', fontSize: 12 },
   sosVerCaso:     { fontFamily: 'Inter-Regular', fontSize: 12, marginTop: 2 },
+  sosEstadoBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  sosEstadoText:   { fontFamily: 'Montserrat-ExtraBold', fontSize: 10 },
+  sosAtencionMsg:  { fontFamily: 'Inter-Regular', fontSize: 11, marginTop: 2 },
   sosCancelarBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,

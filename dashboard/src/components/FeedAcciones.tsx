@@ -39,7 +39,7 @@ const ESTADO_LABEL: Record<EstadoCaso, string> = {
   cerrada:                'Cerrada',
 };
 
-const ESTADO_VARIANT: Record<EstadoCaso, 'blue' | 'yellow' | 'green' | 'gray' | 'red' | 'purple'> = {
+const ESTADO_VARIANT: Record<EstadoCaso, 'blue' | 'yellow' | 'green' | 'gray' | 'red' | 'purple' | 'orange'> = {
   nueva:                  'blue',
   asignada:               'yellow',
   en_seguimiento:         'yellow',

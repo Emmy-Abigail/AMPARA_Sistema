@@ -127,7 +127,7 @@ async def listar_denuncias(
     denuncias = result.scalars().all()
 
     return ApiResponse(data=PaginatedData(
-        data=[DenunciaResponse.model_validate(d) for d in denuncias],
+        data=[DenunciaResponse.from_orm_extended(d) for d in denuncias],
         total=total, pagina=pagina, porPagina=porPagina,
     ))
 
@@ -185,7 +185,7 @@ async def cambiar_estado(
 
     await db.flush()
     await db.refresh(denuncia)
-    return ApiResponse(data=DenunciaResponse.model_validate(denuncia))
+    return ApiResponse(data=DenunciaResponse.from_orm_extended(denuncia))
 
 
 # ─── Asignar operador ─────────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ async def asignar_operador(
     denuncia.fecha_actualizacion = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(denuncia)
-    return ApiResponse(data=DenunciaResponse.model_validate(denuncia))
+    return ApiResponse(data=DenunciaResponse.from_orm_extended(denuncia))
 
 
 # ─── Enviar mensaje a la víctima ──────────────────────────────────────────────

@@ -54,9 +54,13 @@ export const denunciasService = {
   },
 
   async listarMisDenuncias(pagina = 1, porPagina = 20): Promise<PaginatedResponse<Denuncia>> {
+    const deviceId = await storage.getItem(StorageKeys.DEVICE_ID);
     const { data } = await api.get<ApiResponse<PaginatedResponse<Denuncia>>>(
       '/denuncias/mis-denuncias',
-      { params: { pagina, porPagina } },
+      {
+        params: { pagina, porPagina },
+        headers: deviceId ? { 'X-Device-Id': deviceId } : {},
+      },
     );
     return data.data;
   },
